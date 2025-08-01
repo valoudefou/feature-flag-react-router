@@ -28,38 +28,8 @@ export default function Home() {
     }
   ];
 
-
-
-  // Helper to get or create visitorId
-  const getVisitorId = () => {
-    try {
-      const stored = localStorage.getItem('FS_CLIENT_VISITOR');
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        if (parsed?.visitorId) return parsed.visitorId;
-      }
-    } catch (err) {
-      console.warn('Could not parse FS_CLIENT_VISITOR:', err);
-    }
-
-    // fallback to user ID or UUID if FS_CLIENT_VISITOR is not available
-    if (user?.id) return user.id;
-
-    // last resort fallback, but ideally never used now
-    let anonId = localStorage.getItem('anonVisitorId');
-    if (!anonId) {
-      anonId = crypto.randomUUID();
-      localStorage.setItem('anonVisitorId', anonId);
-    }
-    return anonId;
-  };
-
-
   const runFlagship = useCallback(async () => {
     try {
-      const visitorId = getVisitorId();
-
-
       const fsVisitor = await initializeFlagship({
         visitorId: user?.id || '',
         context: {
