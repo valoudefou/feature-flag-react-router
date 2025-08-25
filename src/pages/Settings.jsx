@@ -15,6 +15,10 @@ export default function Settings() {
     email: user?.email || '',
     notifications: true,
     theme: theme || 'light',
+    clientSecret: '',
+    clientId: '',
+    accountId: '',
+    partnerName: '',
   });
 
   // Optional: sync formData.theme if global theme changes externally
@@ -25,8 +29,6 @@ export default function Settings() {
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
 
-    // Remove immediate global theme change on select
-    // Just update local form data
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value,
@@ -38,15 +40,39 @@ export default function Settings() {
     setIsLoading(true);
     setMessage('');
 
-    setTimeout(() => {
-      setIsLoading(false);
-      setMessage('Settings saved successfully!');
+    try {
+      const response = await fetch("https://feature-flag-react-router.vercel.app/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: formData.username,
+          email: formData.email,
+          theme: formData.theme,
+          clientSecret: formData.clientSecret,
+          clientId: formData.clientId,
+          accountId: formData.accountId,
+          partnerName: formData.partnerName,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to save and forward config");
+      }
+
+      setMessage("Settings saved and forwarded successfully!");
       setTheme(formData.theme);
-      localStorage.setItem('theme', formData.theme);
-      localStorage.setItem('themeSource', 'manual'); // ✅ Store manual override
-      setTimeout(() => setMessage(''), 3000);
-    }, 1000);
+      localStorage.setItem("theme", formData.theme);
+      localStorage.setItem("themeSource", "manual");
+    } catch (err) {
+      setMessage(`Error: ${err.message}`);
+    } finally {
+      setIsLoading(false);
+      setTimeout(() => setMessage(""), 5000); // message disappears after 5s
+    }
   };
+
 
 
   return (
@@ -66,7 +92,10 @@ export default function Settings() {
         )}
 
         {/* Settings Form */}
-        <form onSubmit={handleSave} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-6">
+        <form
+          onSubmit={handleSave}
+          className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-6"
+        >
           {/* Profile Section */}
           <div>
             <h2 className="text-lg font-medium mb-4">Profile</h2>
@@ -103,14 +132,60 @@ export default function Settings() {
                 <select
                   name="theme"
                   value={formData.theme}
-                  onChange={handleChange}  // No immediate setTheme here
+                  onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                 >
                   <option value="light">Light</option>
                   <option value="dark">Dark</option>
                 </select>
               </div>
+            </div>
+          </div>
 
+          {/* Configuration Section */}
+          <div className="pt-6">
+            <h2 className="text-lg font-medium mb-4">Configuration</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Client Secret</label>
+                <input
+                  type="password"
+                  name="clientSecret"
+                  value={formData.clientSecret}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Client ID</label>
+                <input
+                  type="text"
+                  name="clientId"
+                  value={formData.clientId}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Account ID</label>
+                <input
+                  type="text"
+                  name="accountId"
+                  value={formData.accountId}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Partner Name</label>
+                <input
+                  type="text"
+                  name="partnerName"
+                  value={formData.partnerName}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+                />
+              </div>
             </div>
           </div>
 

@@ -10,7 +10,7 @@ export default function Layout() {
 
   const isActive = (path) => {
     if (path === '/') return location.pathname === '/';
-    return location.pathname.startsWith(path);
+    return location.pathnaåme.startsWith(path);
   };
 
   const handleLogout = () => {
