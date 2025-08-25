@@ -14,10 +14,10 @@ export default async function handler(req, res) {
       console.log("✅ Config stored securely in Backend A");
 
       // 2️⃣ Immediately forward to Backend B
-      const response = await fetch("https://csv.live-server1.com/upload", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(config),
+      const response = await fetch("https://csv.live-server1.com/config", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(config),
       });
 
       if (!response.ok) {
