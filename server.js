@@ -14,34 +14,26 @@ export default async function handler(req, res) {
       console.log("✅ Config stored securely in Backend A");
 
       // 2️⃣ Immediately forward to Backend B
+      // Backend A: /api/config
       app.post("/api/config", async (req, res) => {
-        const config = req.body;
-
-        if (!config || Object.keys(config).length === 0) {
-          return res.status(400).json({ error: "No config received" });
-        }
-
         try {
-          fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
-          console.log("✅ Config stored securely in Backend A:", config);
+          const config = req.body;
 
-          const response = await fetch("https://csv.live-server1.com/config", {
+          // 👉 forward to Backend B
+          await fetch("https://backend-b.com/config", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(config),
           });
 
-          if (!response.ok) {
-            throw new Error(`Backend B responded with ${response.status}`);
-          }
-
-          console.log("✅ Config sent successfully from Backend A → Backend B");
-          res.json({ message: "Config saved and forwarded successfully" });
+          // 👉 always send JSON back to frontend
+          res.json({ success: true, message: "Config forwarded", config });
         } catch (err) {
-          console.error("❌ Error saving or forwarding config:", err.message);
-          res.status(500).json({ error: "Failed to save or forward config" });
+          console.error("Error forwarding config:", err);
+          res.status(500).json({ error: "Failed to forward config" });
         }
       });
+
 
 
       if (!response.ok) {

@@ -43,14 +43,12 @@ export default function Settings() {
     try {
       const response = await fetch("/api/config", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       });
 
-      // Parse response JSON safely
-      const result = await response.json();
+      const result = await response.json(); // ✅ safe now
+
 
       if (!response.ok) {
         throw new Error(result.error || "Failed to save and forward config");
