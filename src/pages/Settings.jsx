@@ -49,13 +49,11 @@ export default function Settings() {
         body: JSON.stringify(formData),
       });
 
-      const data = await response.json();
-
-
-      const data = await response.json();
+      // Parse response JSON safely
+      const result = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to save and forward config");
+        throw new Error(result.error || "Failed to save and forward config");
       }
 
       setMessage("Settings saved and forwarded successfully!");
@@ -69,6 +67,7 @@ export default function Settings() {
       setTimeout(() => setMessage(""), 5000); // message disappears after 5s
     }
   };
+
 
 
 
