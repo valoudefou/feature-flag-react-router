@@ -9,46 +9,42 @@ export default async function handler(req, res) {
     const config = req.body;
 
     try {
-      // 1️⃣ Store securely in Backend A
+      // 1️⃣ Save locally
       fs.writeFileSync(configFile, JSON.stringify(config, null, 2));
-      console.log("✅ Config stored securely in Backend A");
+      console.log("✅ Config stored locally");
 
-      // 2️⃣ Immediately forward to Backend B
-      // Backend A: /api/config
-      app.post("/api/config", async (req, res) => {
-        try {
-          const config = req.body;
-
-          // 👉 forward to Backend B
-          await fetch("https://backend-b.com/config", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(config),
-          });
-
-          // 👉 always send JSON back to frontend
-          res.json({ success: true, message: "Config forwarded", config });
-        } catch (err) {
-          console.error("Error forwarding config:", err);
-          res.status(500).json({ error: "Failed to forward config" });
-        }
+      // 2️⃣ Forward to Backend B
+      const response = await fetch("https://backend-b.com/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(config),
       });
 
-
-
       if (!response.ok) {
-        throw new Error(`Backend B responded with ${response.status}`);
+        let backendText;
+        try {
+          backendText = await response.text();
+        } catch {
+          backendText = 'No response text';
+        }
+        throw new Error(`Backend B responded with ${response.status}: ${backendText}`);
       }
 
-      console.log("✅ Config sent successfully from Backend A → Backend B");
-
+      console.log("✅ Config forwarded to Backend B");
       res.status(200).json({ message: "Config saved and forwarded successfully" });
+
     } catch (err) {
-      console.error("❌ Error saving or forwarding config:", err.message);
-      res.status(500).json({ error: "Failed to save or forward config" });
+      console.error("❌ Error saving or forwarding config:", err);
+
+      // Structured JSON response with error and stack
+      res.status(500).json({
+        error: err.message || "Failed to save or forward config",
+        stack: err.stack || null,
+      });
     }
+
   } else if (req.method === "GET") {
-    // Optional: retrieve stored config
+    // Optional: return stored config
     if (fs.existsSync(configFile)) {
       const storedConfig = JSON.parse(fs.readFileSync(configFile, "utf-8"));
       return res.status(200).json(storedConfig);
@@ -56,6 +52,6 @@ export default async function handler(req, res) {
     res.status(200).json({});
   } else {
     res.setHeader("Allow", ["POST", "GET"]);
-    res.status(405).end(`Method ${req.method} Not Allowed`);
+    res.status(405).json({ error: `Method ${req.method} Not Allowed` });
   }
 }

@@ -47,24 +47,32 @@ export default function Settings() {
         body: JSON.stringify(formData),
       });
 
-      const result = await response.json(); // ✅ safe now
+      const result = await response.json(); // Parse backend JSON
 
-
+      // If backend returned an error
       if (!response.ok) {
-        throw new Error(result.error || "Failed to save and forward config");
+        const backendStack = result.stack ? `\nStack:\n${result.stack}` : '';
+        throw new Error(`${result.error || "Failed to save and forward config"}${backendStack}`);
       }
 
-      setMessage("Settings saved and forwarded successfully!");
+      // Success
+      setMessage("✅ Settings saved and forwarded successfully!");
       setTheme(formData.theme);
       localStorage.setItem("theme", formData.theme);
       localStorage.setItem("themeSource", "manual");
+
     } catch (err) {
-      setMessage(`Error: ${err.message}`);
+      // Show full error in console
+      console.error("Full error from save:", err);
+
+      // Show friendly message in UI
+      setMessage(`❌ Error: ${err.message}`);
     } finally {
       setIsLoading(false);
-      setTimeout(() => setMessage(""), 5000); // message disappears after 5s
+      setTimeout(() => setMessage(""), 5000); // Hide message after 5s
     }
   };
+
 
 
 
