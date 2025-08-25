@@ -25,6 +25,8 @@ export default function Settings() {
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
 
+    // Remove immediate global theme change on select
+    // Just update local form data
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value,
@@ -36,34 +38,16 @@ export default function Settings() {
     setIsLoading(true);
     setMessage('');
 
-    try {
-      const response = await fetch("https://feature-flag-react-router.vercel.app/api/config", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: formData.username,
-          email: formData.email,
-          theme: formData.theme,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to save config");
-      }
-
-      setMessage("Settings saved successfully!");
-      setTheme(formData.theme);
-      localStorage.setItem("theme", formData.theme);
-      localStorage.setItem("themeSource", "manual");
-    } catch (err) {
-      setMessage(`Error: ${err.message}`);
-    } finally {
+    setTimeout(() => {
       setIsLoading(false);
-      setTimeout(() => setMessage(""), 5000); // message disappears after 5s
-    }
+      setMessage('Settings saved successfully!');
+      setTheme(formData.theme);
+      localStorage.setItem('theme', formData.theme);
+      localStorage.setItem('themeSource', 'manual'); // ✅ Store manual override
+      setTimeout(() => setMessage(''), 3000);
+    }, 1000);
   };
+
 
   return (
     <div className="min-h-screen py-8 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100">
@@ -82,10 +66,7 @@ export default function Settings() {
         )}
 
         {/* Settings Form */}
-        <form
-          onSubmit={handleSave}
-          className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-6"
-        >
+        <form onSubmit={handleSave} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-sm p-6">
           {/* Profile Section */}
           <div>
             <h2 className="text-lg font-medium mb-4">Profile</h2>
@@ -122,13 +103,14 @@ export default function Settings() {
                 <select
                   name="theme"
                   value={formData.theme}
-                  onChange={handleChange}
+                  onChange={handleChange}  // No immediate setTheme here
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
                 >
                   <option value="light">Light</option>
                   <option value="dark">Dark</option>
                 </select>
               </div>
+
             </div>
           </div>
 
