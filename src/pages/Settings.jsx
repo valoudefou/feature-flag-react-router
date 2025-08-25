@@ -41,19 +41,16 @@ export default function Settings() {
     setMessage('');
 
     try {
-      const response = await fetch("https://feature-flag-react-router.vercel.app/api/config", {
+      const response = await fetch("/api/config", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          username: formData.username,
-          email: formData.email,
-          theme: formData.theme,
-          clientSecret: formData.clientSecret,
-          clientId: formData.clientId,
-          accountId: formData.accountId,
-          partnerName: formData.partnerName,
-        }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
       });
+
+      const data = await response.json();
+
 
       const data = await response.json();
 
