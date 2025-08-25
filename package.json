@@ -11,6 +11,7 @@
     "ajv": "6.12.6",
     "ajv-keywords": "3.5.2",
     "lucide-react": "^0.525.0",
+    "node-fetch": "^3.3.2",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.7.0",
