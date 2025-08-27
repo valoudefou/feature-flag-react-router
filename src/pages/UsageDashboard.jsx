@@ -21,6 +21,10 @@ export default function UsageDashboard() {
     const [debugInfo, setDebugInfo] = useState([]);
     const [serverReachable, setServerReachable] = useState(null);
     const [retryCount, setRetryCount] = useState(0);
+    
+    // New filter states
+    const [uploadFilter, setUploadFilter] = useState('all');
+    const [activeTab, setActiveTab] = useState('uploads'); // 'uploads', 'queries', 'ips'
 
     const { user } = useAuth();
     const { theme } = useContext(ThemeContext);
@@ -35,7 +39,11 @@ export default function UsageDashboard() {
         },
         recentUploads: [],
         recentQueries: [],
-        recentIPs: []
+        recentIPs: [],
+        filters: {
+            uploadFilter: 'all',
+            limit: 50
+        }
     };
 
     // Add debug logging function
@@ -45,14 +53,19 @@ export default function UsageDashboard() {
         console.log(`[Dashboard] ${message}`);
     };
 
-    // Simplified server check - just try to fetch data directly
-    const checkServerByFetchingData = async () => {
-        addDebugLog('Testing server by fetching usage data...');
+    // Fetch data with filters
+    const checkServerByFetchingData = async (filters = {}) => {
+        const queryParams = new URLSearchParams({
+            uploadFilter: filters.uploadFilter || uploadFilter,
+            limit: '50'
+        });
+        
+        addDebugLog(`Testing server with filters: ${queryParams.toString()}`);
         try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-            const response = await fetch('https://live-server1.com/api/usage', {
+            const response = await fetch(`https://live-server1.com/api/usage?${queryParams}`, {
                 signal: controller.signal,
                 method: 'GET',
                 headers: {
@@ -78,46 +91,53 @@ export default function UsageDashboard() {
         }
     };
 
+    // Fetch usage data
+    const fetchUsage = async (filters = {}) => {
+        addDebugLog('Starting fetch...');
+        setError(null);
+
+        const result = await checkServerByFetchingData(filters);
+        
+        if (!result.reachable) {
+            addDebugLog('Server unreachable, using offline mode');
+            setData(mockData);
+            setLastUpdated(new Date());
+            setConnectionStatus('offline');
+            setLoading(false);
+            return;
+        }
+
+        try {
+            addDebugLog('Server is reachable, using fetched data');
+            setConnectionStatus('online');
+            setData(result.data);
+            setLastUpdated(new Date());
+            setError(null);
+            setRetryCount(0);
+            addDebugLog('Data fetched successfully');
+            setServerReachable(true);
+
+        } catch (err) {
+            addDebugLog(`Data processing error: ${err.message}`);
+            setError('Error processing server data');
+            setData(mockData);
+            setConnectionStatus('offline');
+            setServerReachable(false);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // Handle filter changes
+    const handleUploadFilterChange = (newFilter) => {
+        setUploadFilter(newFilter);
+        setLoading(true);
+        fetchUsage({ uploadFilter: newFilter });
+    };
+
     useEffect(() => {
         let pollInterval;
         let healthCheckInterval;
-
-        async function fetchUsage() {
-            addDebugLog('Starting fetch...');
-            setError(null);
-
-            const result = await checkServerByFetchingData();
-            
-            if (!result.reachable) {
-                addDebugLog('Server unreachable, using offline mode');
-                setData(mockData);
-                setLastUpdated(new Date());
-                setConnectionStatus('offline');
-                setLoading(false);
-                return;
-            }
-
-            // If we got here, the server is reachable and we have data
-            try {
-                addDebugLog('Server is reachable, using fetched data');
-                setConnectionStatus('online');
-                setData(result.data);
-                setLastUpdated(new Date());
-                setError(null);
-                setRetryCount(0);
-                addDebugLog('Data fetched successfully');
-                setServerReachable(true);
-
-            } catch (err) {
-                addDebugLog(`Data processing error: ${err.message}`);
-                setError('Error processing server data');
-                setData(mockData);
-                setConnectionStatus('offline');
-                setServerReachable(false);
-            } finally {
-                setLoading(false);
-            }
-        }
 
         const startPolling = () => {
             if (pollInterval) {
@@ -135,15 +155,14 @@ export default function UsageDashboard() {
 
             pollInterval = setInterval(() => {
                 addDebugLog('Polling for updates...');
-                fetchUsage();
+                fetchUsage({ uploadFilter });
             }, 60000);
         };
 
         const startHealthCheck = () => {
-            // Check server health every 2 minutes by trying to fetch data
             healthCheckInterval = setInterval(async () => {
                 const wasReachable = serverReachable;
-                const result = await checkServerByFetchingData();
+                const result = await checkServerByFetchingData({ uploadFilter });
                 
                 if (!wasReachable && result.reachable) {
                     addDebugLog('Server came back online, updating data');
@@ -159,7 +178,7 @@ export default function UsageDashboard() {
 
         // Initial setup
         addDebugLog('Dashboard initializing...');
-        fetchUsage().then(() => {
+        fetchUsage({ uploadFilter }).then(() => {
             if (serverReachable) {
                 addDebugLog('Initial fetch complete, starting polling...');
                 startPolling();
@@ -185,31 +204,7 @@ export default function UsageDashboard() {
         setLoading(true);
         setError(null);
         setRetryCount(prev => prev + 1);
-
-        const result = await checkServerByFetchingData();
-        
-        if (!result.reachable) {
-            addDebugLog('Server unreachable during manual refresh');
-            setData(mockData);
-            setLastUpdated(new Date());
-            setConnectionStatus('offline');
-            setLoading(false);
-            return;
-        }
-
-        try {
-            setData(result.data);
-            setLastUpdated(new Date());
-            setError(null);
-            setRetryCount(0);
-            setConnectionStatus('online');
-            addDebugLog('Manual refresh successful');
-        } catch (err) {
-            addDebugLog(`Manual refresh failed: ${err.message}`);
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
+        await fetchUsage({ uploadFilter });
     };
 
     if (loading && !data) {
@@ -431,61 +426,152 @@ export default function UsageDashboard() {
                 </div>
             </div>
 
-            {/* Recent Uploads */}
-            <div className="flex flex-col gap-4">
-                <p className="text-lg font-semibold mb-2">Recent Uploads</p>
-                {recentUploads && recentUploads.length > 0 ? recentUploads.map(u => (
-                    <div key={u.chunkId + u.timestamp} className={cardStyle}>
-                        <div className="flex justify-between items-center mb-1">
-                            <span className="font-mono text-sm truncate">{u.chunkId}</span>
-                            {badge(u.success)}
-                        </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-300">Size: {u.sizeMB || u.size} MB | RequestID: {u.requestId}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-300">IP: {u.ipAddress}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-300 truncate">UA: {u.userAgent}</div>
-                        <div className="text-xs text-gray-400 mt-1">{new Date(u.timestamp || u.createdAt).toLocaleString()}</div>
-                    </div>
-                )) : (
-                    <p className="text-gray-500">
-                        {connectionStatus === 'offline' ? 'No data available (offline mode)' : 'No recent uploads'}
-                    </p>
-                )}
+            {/* Tab Navigation */}
+            <div className="flex space-x-1 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
+                <button
+                    onClick={() => setActiveTab('uploads')}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                        activeTab === 'uploads'
+                            ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow'
+                            : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                    }`}
+                >
+                    Uploads ({recentUploads?.length || 0})
+                </button>
+                <button
+                    onClick={() => setActiveTab('queries')}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                        activeTab === 'queries'
+                            ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow'
+                            : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                    }`}
+                >
+                    Queries ({recentQueries?.length || 0})
+                </button>
+                <button
+                    onClick={() => setActiveTab('ips')}
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                        activeTab === 'ips'
+                            ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow'
+                            : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                    }`}
+                >
+                    IPs/Agents ({recentIPs?.length || 0})
+                </button>
             </div>
 
-            {/* Recent Queries */}
-            <div className="flex flex-col gap-4">
-                <p className="text-lg font-semibold mb-2">Recent Queries</p>
-                {recentQueries && recentQueries.length > 0 ? recentQueries.map(q => (
-                    <div key={q.segmentId + q.timestamp} className={cardStyle}>
-                        <div className="flex justify-between items-center mb-1">
-                            <span className="font-mono text-sm truncate">UserID: {q.userId}</span>
-                            {badge(q.success)}
+            {/* Tab Content */}
+            {activeTab === 'uploads' && (
+                <div className="space-y-4">
+                    {/* Upload Filter */}
+                    <div className="flex items-center gap-4">
+                        <p className="text-lg font-semibold">Recent Uploads</p>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => handleUploadFilterChange('all')}
+                                className={`px-3 py-1 text-sm rounded transition-colors ${
+                                    uploadFilter === 'all'
+                                        ? 'bg-blue-500 text-white'
+                                        : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
+                                }`}
+                            >
+                                All
+                            </button>
+                            <button
+                                onClick={() => handleUploadFilterChange('success')}
+                                className={`px-3 py-1 text-sm rounded transition-colors ${
+                                    uploadFilter === 'success'
+                                        ? 'bg-green-500 text-white'
+                                        : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
+                                }`}
+                            >
+                                Success Only
+                            </button>
+                            <button
+                                onClick={() => handleUploadFilterChange('failed')}
+                                className={`px-3 py-1 text-sm rounded transition-colors ${
+                                    uploadFilter === 'failed'
+                                        ? 'bg-red-500 text-white'
+                                        : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
+                                }`}
+                            >
+                                Failed Only
+                            </button>
                         </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-300 truncate">SegmentID: {q.segmentId}</div>
-                        <div className="text-xs text-gray-400 mt-1">{new Date(q.timestamp || q.createdAt).toLocaleString()}</div>
                     </div>
-                )) : (
-                    <p className="text-gray-500">
-                        {connectionStatus === 'offline' ? 'No data available (offline mode)' : 'No recent queries'}
-                    </p>
-                )}
-            </div>
 
-            {/* Recent IPs */}
-            <div className="flex flex-col gap-4">
-                <p className="text-lg font-semibold mb-2">Recent IPs / User Agents</p>
-                {recentIPs && recentIPs.length > 0 ? recentIPs.map(ip => (
-                    <div key={ip.createdAt} className={cardStyle}>
-                        <div className="font-mono text-sm">{ip.ipAddress}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-300 truncate">{ip.userAgent}</div>
-                        <div className="text-xs text-gray-400 mt-1">{new Date(ip.createdAt).toLocaleString()}</div>
+                    {/* Upload List */}
+                    <div className="grid gap-4">
+                        {recentUploads && recentUploads.length > 0 ? recentUploads.map(u => (
+                            <div key={u.chunkId + u.timestamp} className={cardStyle}>
+                                <div className="flex justify-between items-center mb-1">
+                                    <span className="font-mono text-sm truncate">{u.chunkId}</span>
+                                    {badge(u.success)}
+                                </div>
+                                <div className="text-xs text-gray-500 dark:text-gray-300">Size: {u.sizeMB || u.size} MB | RequestID: {u.requestId}</div>
+                                <div className="text-xs text-gray-500 dark:text-gray-300">IP: {u.ipAddress}</div>
+                                <div className="text-xs text-gray-500 dark:text-gray-300 truncate">UA: {u.userAgent}</div>
+                                <div className="text-xs text-gray-400 mt-1">{new Date(u.timestamp || u.createdAt).toLocaleString()}</div>
+                            </div>
+                        )) : (
+                            <p className="text-gray-500">
+                                {connectionStatus === 'offline' ? 'No data available (offline mode)' : 
+                                 uploadFilter === 'failed' ? 'No failed uploads found' :
+                                 uploadFilter === 'success' ? 'No successful uploads found' :
+                                 'No recent uploads'}
+                            </p>
+                        )}
                     </div>
-                )) : (
-                    <p className="text-gray-500">
-                        {connectionStatus === 'offline' ? 'No data available (offline mode)' : 'No recent IP data'}
-                    </p>
-                )}
-            </div>
+                </div>
+            )}
+
+            {activeTab === 'queries' && (
+                <div className="space-y-4">
+                    <p className="text-lg font-semibold">Recent Queries</p>
+                    <div className="grid gap-4">
+                        {recentQueries && recentQueries.length > 0 ? recentQueries.map(q => (
+                            <div key={q.segmentId + q.timestamp} className={cardStyle}>
+                                <div className="flex justify-between items-center mb-1">
+                                    <span className="font-mono text-sm truncate">UserID: {q.userId}</span>
+                                    {badge(q.success)}
+                                </div>
+                                <div className="text-xs text-gray-500 dark:text-gray-300 truncate">SegmentID: {q.segmentId}</div>
+                                <div className="text-xs text-gray-400 mt-1">{new Date(q.timestamp || q.createdAt).toLocaleString()}</div>
+                            </div>
+                        )) : (
+                            <p className="text-gray-500">
+                                {connectionStatus === 'offline' ? 'No data available (offline mode)' : 'No recent queries'}
+                            </p>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {activeTab === 'ips' && (
+                <div className="space-y-4">
+                    <p className="text-lg font-semibold">Recent IPs / User Agents (Most Active First)</p>
+                    <div className="grid gap-4">
+                        {recentIPs && recentIPs.length > 0 ? recentIPs.map((ip, index) => (
+                            <div key={`${ip.ipAddress}-${ip.userAgent}-${index}`} className={cardStyle}>
+                                <div className="flex justify-between items-center mb-1">
+                                    <div className="font-mono text-sm">{ip.ipAddress}</div>
+                                    <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-bold">
+                                        {ip.count} records
+                                    </span>
+                                </div>
+                                <div className="text-xs text-gray-500 dark:text-gray-300 truncate">{ip.userAgent}</div>
+                                <div className="text-xs text-gray-400 mt-1">
+                                    Last seen: {new Date(ip.lastSeen || ip.createdAt).toLocaleString()}
+                                </div>
+                            </div>
+                        )) : (
+                            <p className="text-gray-500">
+                                {connectionStatus === 'offline' ? 'No data available (offline mode)' : 'No recent IP data'}
+                            </p>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
