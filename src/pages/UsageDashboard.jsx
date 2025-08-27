@@ -78,26 +78,32 @@ export default function UsageDashboard() {
         <h1 className="text-2xl font-bold">Usage Dashboard</h1>
         {lastUpdated && <p className="text-sm text-gray-500 dark:text-gray-300">Updated: {lastUpdated.toLocaleTimeString()}</p>}
       </div>
+{/* Metrics */}
+<div className="flex flex-wrap gap-4">
+  {/* Total Uploads */}
+  <div className={`${cardStyle} flex-1 border-l-4 border-green-500`}>
+    <p className="text-sm font-medium">Total Uploads</p>
+    <p className="text-2xl font-bold">{metrics.totalUploads} ✅</p>
+  </div>
 
-      {/* Metrics */}
-      <div className="flex flex-col gap-4">
-        <div className={cardStyle}>
-          <p className="text-sm font-medium">Total Uploads</p>
-          <p className="text-2xl font-bold">{metrics.totalUploads}</p>
-        </div>
-        <div className={cardStyle}>
-          <p className="text-sm font-medium">Failed Uploads</p>
-          <p className="text-2xl font-bold">{metrics.failedUploads}</p>
-        </div>
-        <div className={cardStyle}>
-          <p className="text-sm font-medium">Total Queries</p>
-          <p className="text-2xl font-bold">{metrics.totalQueries}</p>
-        </div>
-        <div className={cardStyle}>
-          <p className="text-sm font-medium">Failed Queries</p>
-          <p className="text-2xl font-bold">{metrics.failedQueries}</p>
-        </div>
-      </div>
+  {/* Failed Uploads */}
+  <div className={`${cardStyle} flex-1 border-l-4 border-red-500`}>
+    <p className="text-sm font-medium">Failed Uploads</p>
+    <p className="text-2xl font-bold">{metrics.failedUploads} ❌</p>
+  </div>
+
+    {/* Total Queries */}
+    <div className={`${cardStyle} flex-1 border-l-4 border-green-500`}>
+        <p className="text-sm font-medium">Total Queries</p>
+        <p className="text-2xl font-bold">{metrics.totalQueries} ✅</p>
+    </div>
+
+    {/* Failed Queries */}
+    <div className={`${cardStyle} flex-1 border-l-4 border-red-500`}>
+        <p className="text-sm font-medium">Failed Queries</p>
+        <p className="text-2xl font-bold">{metrics.failedQueries} ❌</p>
+    </div>
+    </div>
 
       {/* Charts */}
       <div className="flex flex-col gap-6">
