@@ -26,29 +26,6 @@ export default function UsageDashboard() {
     const [uploadFilter, setUploadFilter] = useState('all');
     const [activeTab, setActiveTab] = useState('uploads'); // 'uploads', 'queries', 'ips'
 
-    const displayUploads = useMemo(() => {
-    console.log('=== RENDER DEBUG ===');
-    console.log('uploadFilter state:', uploadFilter);
-    console.log('recentUploads length:', recentUploads?.length);
-    console.log('recentUploads data:', recentUploads?.map(u => ({ id: u.id, success: u.success })));
-    
-    if (!recentUploads) return [];
-    
-    // Apply client-side filtering as backup to ensure correct display
-    switch (uploadFilter) {
-        case 'failed':
-            const failed = recentUploads.filter(upload => upload.success === false);
-            console.log('Client-filtered failed uploads:', failed.length);
-            return failed;
-        case 'success':
-            const successful = recentUploads.filter(upload => upload.success === true);
-            console.log('Client-filtered successful uploads:', successful.length);
-            return successful;
-        default:
-            return recentUploads;
-    }
-}, [recentUploads, uploadFilter]);
-
     useEffect(() => {
         console.log('uploadFilter state changed to:', uploadFilter);
     }, [uploadFilter]);
@@ -240,7 +217,6 @@ export default function UsageDashboard() {
         };
     }, [uploadFilter]); // ← Add uploadFilter as a dependency
 
-
     const handleRefresh = async () => {
         addDebugLog('Manual refresh triggered');
         setLoading(true);
@@ -307,7 +283,32 @@ export default function UsageDashboard() {
 
     if (!data) return null;
 
+    // MOVED: Data destructuring happens BEFORE the useMemo hook
     const { metrics, recentUploads, recentQueries, recentIPs } = data;
+
+    // MOVED: displayUploads useMemo hook is now AFTER data destructuring
+    const displayUploads = useMemo(() => {
+        console.log('=== RENDER DEBUG ===');
+        console.log('uploadFilter state:', uploadFilter);
+        console.log('recentUploads length:', recentUploads?.length);
+        console.log('recentUploads data:', recentUploads?.map(u => ({ id: u.id, success: u.success })));
+        
+        if (!recentUploads) return [];
+        
+        // Apply client-side filtering as backup to ensure correct display
+        switch (uploadFilter) {
+            case 'failed':
+                const failed = recentUploads.filter(upload => upload.success === false);
+                console.log('Client-filtered failed uploads:', failed.length);
+                return failed;
+            case 'success':
+                const successful = recentUploads.filter(upload => upload.success === true);
+                console.log('Client-filtered successful uploads:', successful.length);
+                return successful;
+            default:
+                return recentUploads;
+        }
+    }, [recentUploads, uploadFilter]);
 
     const uploadsData = [
         { name: 'Uploads', Success: metrics.totalUploads - metrics.failedUploads, Failed: metrics.failedUploads }
