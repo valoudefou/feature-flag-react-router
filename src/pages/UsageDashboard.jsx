@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect, useContext, useCallback } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { ThemeContext } from '../App';
 import {
@@ -47,16 +47,17 @@ export default function UsageDashboard() {
     };
 
     // Add debug logging function
-    const addDebugLog = (message) => {
+    const addDebugLog = useCallback((message) => {
         const timestamp = new Date().toLocaleTimeString();
         setDebugInfo(prev => [`[${timestamp}] ${message}`, ...prev.slice(0, 9)]);
         console.log(`[Dashboard] ${message}`);
-    };
+    }, []);
 
-    // Fetch data with filters
-    const checkServerByFetchingData = async (filters = {}) => {
+    // Fetch data with filters - memoized to prevent unnecessary re-renders
+    const checkServerByFetchingData = useCallback(async (filterOverride = null) => {
+        const currentFilter = filterOverride !== null ? filterOverride : uploadFilter;
         const queryParams = new URLSearchParams({
-            uploadFilter: filters.uploadFilter || uploadFilter,
+            uploadFilter: currentFilter,
             limit: '50'
         });
         
@@ -89,14 +90,14 @@ export default function UsageDashboard() {
             setServerReachable(false);
             return { reachable: false, data: null };
         }
-    };
+    }, [uploadFilter, addDebugLog]);
 
-    // Fetch usage data
-    const fetchUsage = async (filters = {}) => {
-        addDebugLog('Starting fetch...');
+    // Fetch usage data - memoized and properly handles filter changes
+    const fetchUsage = useCallback(async (filterOverride = null) => {
+        addDebugLog(`Starting fetch with filter: ${filterOverride !== null ? filterOverride : uploadFilter}`);
         setError(null);
 
-        const result = await checkServerByFetchingData(filters);
+        const result = await checkServerByFetchingData(filterOverride);
         
         if (!result.reachable) {
             addDebugLog('Server unreachable, using offline mode');
@@ -114,7 +115,7 @@ export default function UsageDashboard() {
             setLastUpdated(new Date());
             setError(null);
             setRetryCount(0);
-            addDebugLog('Data fetched successfully');
+            addDebugLog(`Data fetched successfully - ${result.data.recentUploads?.length || 0} uploads found`);
             setServerReachable(true);
 
         } catch (err) {
@@ -126,15 +127,33 @@ export default function UsageDashboard() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [uploadFilter, checkServerByFetchingData, addDebugLog, mockData]);
 
-    // Handle filter changes
-    const handleUploadFilterChange = (newFilter) => {
+    // Handle filter changes - improved to be more reliable
+    const handleUploadFilterChange = useCallback(async (newFilter) => {
+        if (newFilter === uploadFilter) {
+            addDebugLog(`Filter ${newFilter} already active, skipping`);
+            return;
+        }
+
+        addDebugLog(`Changing filter from ${uploadFilter} to ${newFilter}`);
         setUploadFilter(newFilter);
         setLoading(true);
-        fetchUsage({ uploadFilter: newFilter });
-    };
+        
+        // Fetch data immediately with the new filter
+        await fetchUsage(newFilter);
+    }, [uploadFilter, fetchUsage, addDebugLog]);
 
+    // Manual refresh function
+    const handleRefresh = useCallback(async () => {
+        addDebugLog('Manual refresh triggered');
+        setLoading(true);
+        setError(null);
+        setRetryCount(prev => prev + 1);
+        await fetchUsage();
+    }, [fetchUsage, addDebugLog]);
+
+    // Main effect for initialization and polling
     useEffect(() => {
         let pollInterval;
         let healthCheckInterval;
@@ -155,30 +174,34 @@ export default function UsageDashboard() {
 
             pollInterval = setInterval(() => {
                 addDebugLog('Polling for updates...');
-                fetchUsage({ uploadFilter });
+                fetchUsage(); // This will use the current uploadFilter value
             }, 60000);
         };
 
         const startHealthCheck = () => {
             healthCheckInterval = setInterval(async () => {
                 const wasReachable = serverReachable;
-                const result = await checkServerByFetchingData({ uploadFilter });
+                const result = await checkServerByFetchingData();
                 
                 if (!wasReachable && result.reachable) {
                     addDebugLog('Server came back online, updating data');
                     setData(result.data);
                     setLastUpdated(new Date());
                     setConnectionStatus('online');
+                    startPolling(); // Restart polling when server comes back
                 } else if (wasReachable && !result.reachable) {
                     addDebugLog('Server went offline');
                     setConnectionStatus('offline');
+                    if (pollInterval) {
+                        clearInterval(pollInterval);
+                    }
                 }
             }, 120000);
         };
 
         // Initial setup
         addDebugLog('Dashboard initializing...');
-        fetchUsage({ uploadFilter }).then(() => {
+        fetchUsage().then(() => {
             if (serverReachable) {
                 addDebugLog('Initial fetch complete, starting polling...');
                 startPolling();
@@ -197,15 +220,7 @@ export default function UsageDashboard() {
                 clearInterval(healthCheckInterval);
             }
         };
-    }, []);
-
-    const handleRefresh = async () => {
-        addDebugLog('Manual refresh triggered');
-        setLoading(true);
-        setError(null);
-        setRetryCount(prev => prev + 1);
-        await fetchUsage({ uploadFilter });
-    };
+    }, [uploadFilter, fetchUsage, checkServerByFetchingData, serverReachable, addDebugLog]); // Added uploadFilter to dependencies
 
     if (loading && !data) {
         return (
@@ -327,6 +342,11 @@ export default function UsageDashboard() {
                             'bg-red-500'
                         }`}></div>
                         <span className="text-sm font-medium">{getConnectionStatusText()}</span>
+                    </div>
+
+                    {/* Current Filter Display */}
+                    <div className="text-sm text-gray-500 dark:text-gray-300">
+                        Filter: <span className="font-mono">{uploadFilter}</span>
                     </div>
 
                     {/* Manual Refresh Button */}
@@ -469,41 +489,52 @@ export default function UsageDashboard() {
                         <div className="flex gap-2">
                             <button
                                 onClick={() => handleUploadFilterChange('all')}
-                                className={`px-3 py-1 text-sm rounded transition-colors ${
+                                disabled={loading}
+                                className={`px-3 py-1 text-sm rounded transition-colors disabled:opacity-50 ${
                                     uploadFilter === 'all'
                                         ? 'bg-blue-500 text-white'
                                         : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
                                 }`}
                             >
-                                All
+                                All {loading && uploadFilter === 'all' && '⏳'}
                             </button>
                             <button
                                 onClick={() => handleUploadFilterChange('success')}
-                                className={`px-3 py-1 text-sm rounded transition-colors ${
+                                disabled={loading}
+                                className={`px-3 py-1 text-sm rounded transition-colors disabled:opacity-50 ${
                                     uploadFilter === 'success'
                                         ? 'bg-green-500 text-white'
                                         : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
                                 }`}
                             >
-                                Success Only
+                                Success Only {loading && uploadFilter === 'success' && '⏳'}
                             </button>
                             <button
                                 onClick={() => handleUploadFilterChange('failed')}
-                                className={`px-3 py-1 text-sm rounded transition-colors ${
+                                disabled={loading}
+                                className={`px-3 py-1 text-sm rounded transition-colors disabled:opacity-50 ${
                                     uploadFilter === 'failed'
                                         ? 'bg-red-500 text-white'
                                         : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
                                 }`}
                             >
-                                Failed Only
+                                Failed Only {loading && uploadFilter === 'failed' && '⏳'}
                             </button>
                         </div>
                     </div>
 
+                    {/* Loading indicator for filter changes */}
+                    {loading && (
+                        <div className="flex items-center gap-2 text-blue-600">
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                            <span className="text-sm">Applying filter: {uploadFilter}</span>
+                        </div>
+                    )}
+
                     {/* Upload List */}
                     <div className="grid gap-4">
-                        {recentUploads && recentUploads.length > 0 ? recentUploads.map(u => (
-                            <div key={u.chunkId + u.timestamp} className={cardStyle}>
+                        {recentUploads && recentUploads.length > 0 ? recentUploads.map((u, index) => (
+                            <div key={`${u.chunkId}-${u.createdAt}-${index}`} className={cardStyle}>
                                 <div className="flex justify-between items-center mb-1">
                                     <span className="font-mono text-sm truncate">{u.chunkId}</span>
                                     {badge(u.success)}
@@ -529,8 +560,8 @@ export default function UsageDashboard() {
                 <div className="space-y-4">
                     <p className="text-lg font-semibold">Recent Queries</p>
                     <div className="grid gap-4">
-                        {recentQueries && recentQueries.length > 0 ? recentQueries.map(q => (
-                            <div key={q.segmentId + q.timestamp} className={cardStyle}>
+                        {recentQueries && recentQueries.length > 0 ? recentQueries.map((q, index) => (
+                            <div key={`${q.segmentId}-${q.createdAt}-${index}`} className={cardStyle}>
                                 <div className="flex justify-between items-center mb-1">
                                     <span className="font-mono text-sm truncate">UserID: {q.userId}</span>
                                     {badge(q.success)}
