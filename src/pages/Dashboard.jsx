@@ -18,6 +18,7 @@ export default function Dashboard() {
   const navigationItems = [
     { path: 'profile', label: 'Profile', icon: '👤' },
     { path: 'settings', label: 'Settings', icon: '⚙️' },
+    { path: 'usage', label: 'Usage', icon: '📊' }, // <-- add this
   ];
 
   const stats = [
