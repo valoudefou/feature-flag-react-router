@@ -33,34 +33,25 @@ export default function UsageDashboard() {
     const isInitialMount = useRef(true);
 
     // MOVED: displayUploads useMemo hook to the top, right after state and context
-    const displayUploads = useMemo(() => {
-        console.log('=== RENDER DEBUG ===');
-        console.log('uploadFilter state:', uploadFilter);
-        
-        // Handle case when data is not loaded yet
-        if (!data?.recentUploads) {
-            console.log('No data available yet');
-            return [];
-        }
-        
-        const recentUploads = data.recentUploads;
-        console.log('recentUploads length:', recentUploads?.length);
-        console.log('recentUploads data:', recentUploads?.map(u => ({ id: u.id, success: u.success })));
-        
-        // Apply client-side filtering as backup to ensure correct display
-        switch (uploadFilter) {
-            case 'failed':
-                const failed = recentUploads.filter(upload => upload.success === false);
-                console.log('Client-filtered failed uploads:', failed.length);
-                return failed;
-            case 'success':
-                const successful = recentUploads.filter(upload => upload.success === true);
-                console.log('Client-filtered successful uploads:', successful.length);
-                return successful;
-            default:
-                return recentUploads;
-        }
-    }, [data?.recentUploads, uploadFilter]);
+const displayUploads = useMemo(() => {
+    console.log('=== RENDER DEBUG ===');
+    console.log('uploadFilter state:', uploadFilter);
+    
+    // Handle case when data is not loaded yet
+    if (!data?.recentUploads) {
+        console.log('No data available yet');
+        return [];
+    }
+    
+    const recentUploads = data.recentUploads;
+    console.log('recentUploads length:', recentUploads?.length);
+    console.log('recentUploads data:', recentUploads?.map(u => ({ id: u.id, success: u.success })));
+    
+    // Server already filtered the data, so just return it directly
+    console.log('Returning server-filtered data:', recentUploads.length, 'records');
+    return recentUploads;
+}, [data?.recentUploads, uploadFilter]);
+
 
     useEffect(() => {
         console.log('uploadFilter state changed to:', uploadFilter);
@@ -129,53 +120,62 @@ export default function UsageDashboard() {
     };
 
     // Fetch usage data
-    const fetchUsage = async (filters = {}) => {
-        addDebugLog('Starting fetch...');
+const fetchUsage = async (filters = {}) => {
+    addDebugLog('Starting fetch...');
+    setError(null);
+
+    const result = await checkServerByFetchingData(filters);
+
+    if (!result.reachable) {
+        addDebugLog('Server unreachable, using offline mode');
+        setData(mockData);
+        setLastUpdated(new Date());
+        setConnectionStatus('offline');
+        setLoading(false);
+        return;
+    }
+
+    try {
+        addDebugLog('Server is reachable, using fetched data');
+        setConnectionStatus('online');
+        setData(result.data);
+        
+        console.log('=== SERVER RESPONSE DEBUG ===');
+        console.log('Filter requested:', filters.uploadFilter);
+        console.log('Server returned uploads:', result.data.recentUploads?.length || 0);
+        console.log('Server upload details:', result.data.recentUploads?.map(u => ({ 
+            id: u.id, 
+            success: u.success, 
+            chunkId: u.chunkId 
+        })));
+        
+        // Verify server filtering worked correctly
+        const serverSuccess = result.data.recentUploads?.filter(u => u.success).length || 0;
+        const serverFailed = result.data.recentUploads?.filter(u => !u.success).length || 0;
+        console.log('Server filtering verification:', {
+            filter: filters.uploadFilter,
+            successCount: serverSuccess,
+            failedCount: serverFailed,
+            total: result.data.recentUploads?.length || 0
+        });
+        
+        setLastUpdated(new Date());
         setError(null);
+        setRetryCount(0);
+        addDebugLog(`Data fetched successfully - ${result.data.recentUploads?.length || 0} uploads`);
+        setServerReachable(true);
 
-        const result = await checkServerByFetchingData(filters);
+    } catch (err) {
+        addDebugLog(`Data processing error: ${err.message}`);
+        setError('Error processing server data');
+        setData(mockData);
+        setConnectionStatus('offline');
+        setServerReachable(false);
+    } finally {
+        setLoading(false);
+    }
+};
 
-        if (!result.reachable) {
-            addDebugLog('Server unreachable, using offline mode');
-            setData(mockData);
-            setLastUpdated(new Date());
-            setConnectionStatus('offline');
-            setLoading(false);
-            return;
-        }
-
-        try {
-            addDebugLog('Server is reachable, using fetched data');
-            setConnectionStatus('online');
-            setData(result.data);
-            console.log('=== FRONTEND DEBUG ===');
-            console.log('Filter requested:', filters.uploadFilter);  // FIXED: Use the passed filter parameter
-            console.log('Server response uploads:', result.data.recentUploads);
-            console.log('Upload success distribution:', {
-                total: result.data.recentUploads?.length || 0,
-                successful: result.data.recentUploads?.filter(u => u.success).length || 0,
-                failed: result.data.recentUploads?.filter(u => !u.success).length || 0
-            });
-            // REMOVED: Confusing log that showed old state value
-            // console.log('Current uploadFilter state:', uploadFilter);
-            setLastUpdated(new Date());
-            setError(null);
-            setRetryCount(0);
-            addDebugLog('Data fetched successfully');
-            setServerReachable(true);
-
-        } catch (err) {
-            addDebugLog(`Data processing error: ${err.message}`);
-            setError('Error processing server data');
-            setData(mockData);
-            setConnectionStatus('offline');
-            setServerReachable(false);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-// FIXED: Handle filter changes properly
 // FIXED: Make the filter change handler async and wait for completion
 const handleUploadFilterChange = async (newFilter) => {
     console.log('=== FILTER CHANGE START ===');
@@ -437,8 +437,7 @@ useEffect(() => {
                     <p>Server is unreachable. Showing empty dashboard. Data will update when server comes back online.</p>
                 </div>
             )}
-
-   {/* Enhanced Debug Panel */}
+{/* Enhanced Debug Panel */}
 <details className="mb-4">
     <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-800">
         Debug Information ({debugInfo.length} logs) - Current Filter: {uploadFilter}
@@ -448,11 +447,20 @@ useEffect(() => {
             Current State: Filter={uploadFilter}, Loading={loading.toString()}, 
             DisplayUploads={displayUploads?.length || 0}
         </div>
+        <div className="font-bold text-green-600">
+            Server Data: {data?.recentUploads?.length || 0} uploads returned from server
+        </div>
+        <div className="font-bold text-purple-600">
+            Success Distribution: 
+            Success={data?.recentUploads?.filter(u => u.success).length || 0}, 
+            Failed={data?.recentUploads?.filter(u => !u.success).length || 0}
+        </div>
         {debugInfo.map((log, index) => (
             <div key={index} className="font-mono">{log}</div>
         ))}
     </div>
 </details>
+
 
 
             {/* Error Banner */}
