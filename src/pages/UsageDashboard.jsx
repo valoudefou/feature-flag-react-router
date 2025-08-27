@@ -39,11 +39,11 @@ export default function UsageDashboard() {
             addDebugLog('Starting fetch...');
             setLoading(true);
             setError(null);
-            
+
             try {
                 // First, let's test if the server is reachable
                 addDebugLog('Testing server connectivity...');
-                
+
                 const res = await fetch("https://live-server1.com/api/usage", {
                     method: 'GET',
                     headers: {
@@ -52,16 +52,16 @@ export default function UsageDashboard() {
                     },
                     // Remove timeout for now to see if it's a timeout issue
                 });
-                
+
                 addDebugLog(`Server responded with status: ${res.status}`);
-                
+
                 if (!res.ok) {
                     throw new Error(`HTTP ${res.status}: ${res.statusText}`);
                 }
-                
+
                 const text = await res.text();
                 addDebugLog(`Received response: ${text.substring(0, 100)}...`);
-                
+
                 let json;
                 try {
                     json = JSON.parse(text);
@@ -69,16 +69,16 @@ export default function UsageDashboard() {
                     addDebugLog(`JSON parse error: ${parseError.message}`);
                     throw new Error(`Invalid JSON response: ${text.substring(0, 200)}`);
                 }
-                
+
                 setData(json);
                 setLastUpdated(new Date());
                 setError(null);
                 addDebugLog('Data fetched successfully');
-                
+
             } catch (err) {
                 addDebugLog(`Fetch error: ${err.message}`);
                 console.error("Usage fetch error:", err);
-                
+
                 // More specific error messages
                 if (err.name === 'TypeError' && err.message.includes('Failed to fetch')) {
                     setError('Cannot connect to server - check if https://live-server1.com is running');
@@ -93,9 +93,14 @@ export default function UsageDashboard() {
         }
 
         const connectSSE = () => {
+            // Clear any existing connection
+            if (evtSource) {
+                evtSource.close();
+            }
+
             addDebugLog('Attempting SSE connection...');
             setConnectionStatus('connecting');
-            
+
             try {
                 evtSource = new EventSource('https://live-server1.com/events');
 
@@ -104,11 +109,20 @@ export default function UsageDashboard() {
                     setConnectionStatus('connected');
                 };
 
+                evtSource.addEventListener('connected', e => {
+                    addDebugLog('Received connection confirmation');
+                });
+
+                evtSource.addEventListener('heartbeat', e => {
+                    // Don't log every heartbeat to avoid spam
+                    // addDebugLog('SSE heartbeat received');
+                });
+
                 evtSource.addEventListener('upload', e => {
                     addDebugLog('Received upload event');
                     setIsLiveUpdate(true);
                     setTimeout(() => setIsLiveUpdate(false), 3000);
-                    
+
                     try {
                         const eventData = JSON.parse(e.data);
                         setData(prev => {
@@ -131,7 +145,7 @@ export default function UsageDashboard() {
                     addDebugLog('Received query event');
                     setIsLiveUpdate(true);
                     setTimeout(() => setIsLiveUpdate(false), 3000);
-                    
+
                     try {
                         const eventData = JSON.parse(e.data);
                         setData(prev => {
@@ -157,30 +171,34 @@ export default function UsageDashboard() {
                     fetchUsage();
                 });
 
-                evtSource.addEventListener('heartbeat', e => {
-                    addDebugLog('SSE heartbeat received');
-                });
-
                 evtSource.onerror = (err) => {
-                    addDebugLog(`SSE error occurred`);
+                    addDebugLog(`SSE error: ${evtSource.readyState} - ${err.type}`);
                     setConnectionStatus('disconnected');
-                    
+
+                    // Close the current connection
                     if (evtSource) {
                         evtSource.close();
                     }
-                    
-                    // Retry after 10 seconds instead of 5
+
+                    // Wait longer before reconnecting to avoid rapid reconnection loops
                     retryTimeout = setTimeout(() => {
                         addDebugLog('Retrying SSE connection...');
                         connectSSE();
-                    }, 10000);
+                    }, 5000); // Reduced from 10 seconds
                 };
 
             } catch (err) {
                 addDebugLog(`SSE setup error: ${err.message}`);
                 setConnectionStatus('error');
+
+                // Retry after error
+                retryTimeout = setTimeout(() => {
+                    addDebugLog('Retrying after setup error...');
+                    connectSSE();
+                }, 10000);
             }
         };
+
 
         // Start with fetch only, then SSE
         fetchUsage().then(() => {
@@ -222,18 +240,18 @@ export default function UsageDashboard() {
         addDebugLog('Manual refresh triggered');
         setLoading(true);
         setError(null);
-        
+
         try {
             const res = await fetch("https://live-server1.com/api/usage", {
                 headers: {
                     'Accept': 'application/json',
                 }
             });
-            
+
             if (!res.ok) {
                 throw new Error(`HTTP ${res.status}: ${res.statusText}`);
             }
-            
+
             const json = await res.json();
             setData(json);
             setLastUpdated(new Date());
@@ -252,7 +270,7 @@ export default function UsageDashboard() {
             <div className="p-4 flex flex-col items-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mb-2"></div>
                 <p>Loading usage data...</p>
-                
+
                 {/* Debug Panel */}
                 <div className="mt-4 p-4 bg-gray-100 rounded-lg w-full max-w-2xl">
                     <h3 className="font-bold mb-2">Debug Information:</h3>
@@ -261,7 +279,7 @@ export default function UsageDashboard() {
                             <div key={index} className="font-mono">{log}</div>
                         ))}
                     </div>
-                    <button 
+                    <button
                         onClick={testConnection}
                         className="mt-2 px-3 py-1 bg-blue-500 text-white text-sm rounded"
                     >
@@ -276,7 +294,7 @@ export default function UsageDashboard() {
         return (
             <div className="p-4 text-center">
                 <p className="text-red-500 mb-4">Error: {error}</p>
-                
+
                 {/* Debug Panel */}
                 <div className="mb-4 p-4 bg-gray-100 rounded-lg">
                     <h3 className="font-bold mb-2">Debug Information:</h3>
@@ -286,15 +304,15 @@ export default function UsageDashboard() {
                         ))}
                     </div>
                 </div>
-                
+
                 <div className="space-x-2">
-                    <button 
+                    <button
                         onClick={handleRefresh}
                         className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
                     >
                         Retry
                     </button>
-                    <button 
+                    <button
                         onClick={testConnection}
                         className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
                     >
@@ -353,11 +371,10 @@ export default function UsageDashboard() {
                 <div className="flex items-center gap-4">
                     {/* Connection Status */}
                     <div className={`flex items-center gap-2 ${getConnectionStatusColor()}`}>
-                        <div className={`w-2 h-2 rounded-full ${
-                            connectionStatus === 'connected' ? 'bg-green-500' : 
-                            connectionStatus === 'connecting' ? 'bg-yellow-500 animate-pulse' : 
-                            'bg-red-500'
-                        }`}></div>
+                        <div className={`w-2 h-2 rounded-full ${connectionStatus === 'connected' ? 'bg-green-500' :
+                                connectionStatus === 'connecting' ? 'bg-yellow-500 animate-pulse' :
+                                    'bg-red-500'
+                            }`}></div>
                         <span className="text-sm font-medium">{getConnectionStatusText()}</span>
                     </div>
 
@@ -370,7 +387,7 @@ export default function UsageDashboard() {
                     )}
 
                     {/* Manual Refresh Button */}
-                    <button 
+                    <button
                         onClick={handleRefresh}
                         disabled={loading}
                         className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 transition-colors"
