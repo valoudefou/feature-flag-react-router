@@ -21,14 +21,14 @@ export default function UsageDashboard() {
     const [debugInfo, setDebugInfo] = useState([]);
     const [serverReachable, setServerReachable] = useState(null);
     const [retryCount, setRetryCount] = useState(0);
-    
+
     // New filter states
     const [uploadFilter, setUploadFilter] = useState('all');
     const [activeTab, setActiveTab] = useState('uploads'); // 'uploads', 'queries', 'ips'
 
-      useEffect(() => {
-    console.log('uploadFilter state changed to:', uploadFilter);
-  }, [uploadFilter]);
+    useEffect(() => {
+        console.log('uploadFilter state changed to:', uploadFilter);
+    }, [uploadFilter]);
 
     const { user } = useAuth();
     const { theme } = useContext(ThemeContext);
@@ -63,7 +63,7 @@ export default function UsageDashboard() {
             uploadFilter: filters.uploadFilter || uploadFilter,
             limit: '50'
         });
-        
+
         addDebugLog(`Testing server with filters: ${queryParams.toString()}`);
         try {
             const controller = new AbortController();
@@ -101,7 +101,7 @@ export default function UsageDashboard() {
         setError(null);
 
         const result = await checkServerByFetchingData(filters);
-        
+
         if (!result.reachable) {
             addDebugLog('Server unreachable, using offline mode');
             setData(mockData);
@@ -116,14 +116,14 @@ export default function UsageDashboard() {
             setConnectionStatus('online');
             setData(result.data);
             console.log('=== FRONTEND DEBUG ===');
-console.log('Filter requested:', filters.uploadFilter || uploadFilter);
-console.log('Server response uploads:', result.data.recentUploads);
-console.log('Upload success distribution:', {
-  total: result.data.recentUploads?.length || 0,
-  successful: result.data.recentUploads?.filter(u => u.success).length || 0,
-  failed: result.data.recentUploads?.filter(u => !u.success).length || 0
-});
-console.log('Current uploadFilter state:', uploadFilter);
+            console.log('Filter requested:', filters.uploadFilter || uploadFilter);
+            console.log('Server response uploads:', result.data.recentUploads);
+            console.log('Upload success distribution:', {
+                total: result.data.recentUploads?.length || 0,
+                successful: result.data.recentUploads?.filter(u => u.success).length || 0,
+                failed: result.data.recentUploads?.filter(u => !u.success).length || 0
+            });
+            console.log('Current uploadFilter state:', uploadFilter);
             setLastUpdated(new Date());
             setError(null);
             setRetryCount(0);
@@ -142,14 +142,14 @@ console.log('Current uploadFilter state:', uploadFilter);
     };
 
     // Handle filter changes
-const handleUploadFilterChange = (newFilter) => {
-    console.log('Filter change requested:', newFilter);
-    setUploadFilter(newFilter);
-    setLoading(true);
-    
-    // Pass the newFilter directly instead of relying on state
-    fetchUsage({ uploadFilter: newFilter });
-};
+    const handleUploadFilterChange = (newFilter) => {
+        console.log('Filter change requested:', newFilter);
+        setUploadFilter(newFilter);
+        setLoading(true);
+
+        // Pass the newFilter directly instead of relying on state
+        fetchUsage({ uploadFilter: newFilter });
+    };
 
     useEffect(() => {
         let pollInterval;
@@ -171,15 +171,17 @@ const handleUploadFilterChange = (newFilter) => {
 
             pollInterval = setInterval(() => {
                 addDebugLog('Polling for updates...');
-                fetchUsage({ uploadFilter });
+                // Use the current state value by accessing it directly
+                fetchUsage({ uploadFilter: uploadFilter });
             }, 60000);
         };
 
         const startHealthCheck = () => {
             healthCheckInterval = setInterval(async () => {
                 const wasReachable = serverReachable;
-                const result = await checkServerByFetchingData({ uploadFilter });
-                
+                // Use current state value
+                const result = await checkServerByFetchingData({ uploadFilter: uploadFilter });
+
                 if (!wasReachable && result.reachable) {
                     addDebugLog('Server came back online, updating data');
                     setData(result.data);
@@ -199,13 +201,13 @@ const handleUploadFilterChange = (newFilter) => {
                 addDebugLog('Initial fetch complete, starting polling...');
                 startPolling();
             }
-            
+
             startHealthCheck();
         });
 
         return () => {
             addDebugLog('Component unmounting, cleaning up');
-            
+
             if (pollInterval) {
                 clearInterval(pollInterval);
             }
@@ -213,7 +215,8 @@ const handleUploadFilterChange = (newFilter) => {
                 clearInterval(healthCheckInterval);
             }
         };
-    }, []);
+    }, [uploadFilter]); // ← Add uploadFilter as a dependency
+
 
     const handleRefresh = async () => {
         addDebugLog('Manual refresh triggered');
@@ -335,13 +338,12 @@ const handleUploadFilterChange = (newFilter) => {
 
                     {/* Connection Status */}
                     <div className={`flex items-center gap-2 ${getConnectionStatusColor()}`}>
-                        <div className={`w-2 h-2 rounded-full ${
-                            connectionStatus === 'online' ? 'bg-green-500' :
-                            connectionStatus === 'checking' ? 'bg-yellow-500 animate-pulse' :
-                            connectionStatus === 'polling' ? 'bg-blue-500 animate-pulse' :
-                            connectionStatus === 'offline' ? 'bg-gray-500' :
-                            'bg-red-500'
-                        }`}></div>
+                        <div className={`w-2 h-2 rounded-full ${connectionStatus === 'online' ? 'bg-green-500' :
+                                connectionStatus === 'checking' ? 'bg-yellow-500 animate-pulse' :
+                                    connectionStatus === 'polling' ? 'bg-blue-500 animate-pulse' :
+                                        connectionStatus === 'offline' ? 'bg-gray-500' :
+                                            'bg-red-500'
+                            }`}></div>
                         <span className="text-sm font-medium">{getConnectionStatusText()}</span>
                     </div>
 
@@ -446,31 +448,28 @@ const handleUploadFilterChange = (newFilter) => {
             <div className="flex space-x-1 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
                 <button
                     onClick={() => setActiveTab('uploads')}
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                        activeTab === 'uploads'
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'uploads'
                             ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow'
                             : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                    }`}
+                        }`}
                 >
                     Uploads ({recentUploads?.length || 0})
                 </button>
                 <button
                     onClick={() => setActiveTab('queries')}
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                        activeTab === 'queries'
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'queries'
                             ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow'
                             : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                    }`}
+                        }`}
                 >
                     Queries ({recentQueries?.length || 0})
                 </button>
                 <button
                     onClick={() => setActiveTab('ips')}
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                        activeTab === 'ips'
+                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'ips'
                             ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow'
                             : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                    }`}
+                        }`}
                 >
                     IPs/Agents ({recentIPs?.length || 0})
                 </button>
@@ -485,34 +484,31 @@ const handleUploadFilterChange = (newFilter) => {
                         <div className="flex gap-2">
                             <button
                                 onClick={() => handleUploadFilterChange('all')}
-                                className={`px-3 py-1 text-sm rounded transition-colors ${
-                                    uploadFilter === 'all'
+                                className={`px-3 py-1 text-sm rounded transition-colors ${uploadFilter === 'all'
                                         ? 'bg-blue-500 text-white'
                                         : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
-                                }`}
+                                    }`}
                             >
                                 All
                             </button>
                             <button
                                 onClick={() => handleUploadFilterChange('success')}
-                                className={`px-3 py-1 text-sm rounded transition-colors ${
-                                    uploadFilter === 'success'
+                                className={`px-3 py-1 text-sm rounded transition-colors ${uploadFilter === 'success'
                                         ? 'bg-green-500 text-white'
                                         : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
-                                }`}
+                                    }`}
                             >
                                 Success Only
                             </button>
-<button 
-    className={`px-4 py-2 rounded-lg transition-colors ${
-        uploadFilter === 'failed' 
-            ? 'bg-red-500 text-white' 
-            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-    }`}
-    onClick={() => handleUploadFilterChange('failed')}
->
-    Failed Only
-</button>
+                            <button
+                                className={`px-4 py-2 rounded-lg transition-colors ${uploadFilter === 'failed'
+                                        ? 'bg-red-500 text-white'
+                                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                                    }`}
+                                onClick={() => handleUploadFilterChange('failed')}
+                            >
+                                Failed Only
+                            </button>
 
                         </div>
                     </div>
@@ -532,10 +528,10 @@ const handleUploadFilterChange = (newFilter) => {
                             </div>
                         )) : (
                             <p className="text-gray-500">
-                                {connectionStatus === 'offline' ? 'No data available (offline mode)' : 
-                                 uploadFilter === 'failed' ? 'No failed uploads found' :
-                                 uploadFilter === 'success' ? 'No successful uploads found' :
-                                 'No recent uploads'}
+                                {connectionStatus === 'offline' ? 'No data available (offline mode)' :
+                                    uploadFilter === 'failed' ? 'No failed uploads found' :
+                                        uploadFilter === 'success' ? 'No successful uploads found' :
+                                            'No recent uploads'}
                             </p>
                         )}
                     </div>
