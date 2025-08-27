@@ -18,12 +18,27 @@ export default function UsageDashboard() {
     const [error, setError] = useState(null);
     const [lastUpdated, setLastUpdated] = useState(null);
     const [isLiveUpdate, setIsLiveUpdate] = useState(false);
-    const [connectionStatus, setConnectionStatus] = useState('polling');
+    const [connectionStatus, setConnectionStatus] = useState('checking');
     const [debugInfo, setDebugInfo] = useState([]);
-    const [sseEnabled, setSseEnabled] = useState(false); // Start with SSE disabled
+    const [sseEnabled, setSseEnabled] = useState(false);
+    const [serverReachable, setServerReachable] = useState(null);
+    const [retryCount, setRetryCount] = useState(0);
 
     const { user } = useAuth();
     const { theme } = useContext(ThemeContext);
+
+    // Mock data for when server is unreachable
+    const mockData = {
+        metrics: {
+            totalUploads: 0,
+            failedUploads: 0,
+            totalQueries: 0,
+            failedQueries: 0
+        },
+        recentUploads: [],
+        recentQueries: [],
+        recentIPs: []
+    };
 
     // Add debug logging function
     const addDebugLog = (message) => {
@@ -32,20 +47,70 @@ export default function UsageDashboard() {
         console.log(`[Dashboard] ${message}`);
     };
 
+    // Check if server is reachable
+    const checkServerHealth = async () => {
+        addDebugLog('Checking server health...');
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+
+            const response = await fetch('https://live-server1.com/health', {
+                signal: controller.signal,
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                },
+            });
+
+            clearTimeout(timeoutId);
+
+            if (response.ok) {
+                addDebugLog('Server is reachable');
+                setServerReachable(true);
+                return true;
+            } else {
+                addDebugLog(`Server health check failed: ${response.status}`);
+                setServerReachable(false);
+                return false;
+            }
+        } catch (err) {
+            addDebugLog(`Server health check failed: ${err.message}`);
+            setServerReachable(false);
+            return false;
+        }
+    };
+
     useEffect(() => {
         let evtSource;
         let retryTimeout;
         let pollInterval;
+        let healthCheckInterval;
 
         async function fetchUsage() {
             addDebugLog('Starting fetch...');
-            if (!loading) setLoading(true);
             setError(null);
+
+            // First check if server is reachable
+            const isReachable = await checkServerHealth();
+            
+            if (!isReachable) {
+                addDebugLog('Server unreachable, using offline mode');
+                setData(mockData);
+                setLastUpdated(new Date());
+                setConnectionStatus('offline');
+                setLoading(false);
+                return;
+            }
 
             try {
                 addDebugLog('Fetching from server...');
+                setConnectionStatus('fetching');
+
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
 
                 const res = await fetch("https://live-server1.com/api/usage", {
+                    signal: controller.signal,
                     method: 'GET',
                     headers: {
                         'Accept': 'application/json',
@@ -54,6 +119,7 @@ export default function UsageDashboard() {
                     },
                 });
 
+                clearTimeout(timeoutId);
                 addDebugLog(`Server responded with status: ${res.status}`);
 
                 if (!res.ok) {
@@ -74,16 +140,22 @@ export default function UsageDashboard() {
                 setData(json);
                 setLastUpdated(new Date());
                 setError(null);
+                setRetryCount(0); // Reset retry count on success
                 addDebugLog('Data fetched successfully');
+                setServerReachable(true);
 
             } catch (err) {
                 addDebugLog(`Fetch error: ${err.message}`);
                 console.error("Usage fetch error:", err);
 
-                if (err.name === 'TypeError' && err.message.includes('Failed to fetch')) {
-                    setError('Cannot connect to server - check if https://live-server1.com is running');
-                } else if (err.name === 'AbortError') {
+                if (err.name === 'AbortError') {
                     setError('Request timeout - server is too slow');
+                } else if (err.name === 'TypeError' && err.message.includes('Failed to fetch')) {
+                    setError('Cannot connect to server - using offline mode');
+                    setData(mockData);
+                    setLastUpdated(new Date());
+                    setConnectionStatus('offline');
+                    setServerReachable(false);
                 } else {
                     setError(err.message);
                 }
@@ -93,8 +165,8 @@ export default function UsageDashboard() {
         }
 
         const connectSSE = () => {
-            if (!sseEnabled) {
-                addDebugLog('SSE is disabled, skipping connection');
+            if (!sseEnabled || !serverReachable) {
+                addDebugLog('SSE disabled or server unreachable, skipping connection');
                 return;
             }
 
@@ -133,7 +205,7 @@ export default function UsageDashboard() {
                 });
 
                 evtSource.addEventListener('heartbeat', e => {
-                    addDebugLog('SSE heartbeat received');
+                    // Don't log every heartbeat to avoid spam
                     if (!connectionEstablished) {
                         connectionEstablished = true;
                         setConnectionStatus('connected');
@@ -203,22 +275,22 @@ export default function UsageDashboard() {
                     }
 
                     // Only reconnect if we haven't exceeded max attempts
-                    if (reconnectAttempts < maxReconnectAttempts) {
+                    if (reconnectAttempts < maxReconnectAttempts && serverReachable) {
                         reconnectAttempts++;
-                        const delay = Math.min(5000 * reconnectAttempts, 30000); // Exponential backoff, max 30s
+                        const delay = Math.min(5000 * reconnectAttempts, 30000);
                         addDebugLog(`Will retry SSE connection in ${delay/1000}s (attempt ${reconnectAttempts}/${maxReconnectAttempts})`);
                         
                         retryTimeout = setTimeout(() => {
-                            if (sseEnabled) {
+                            if (sseEnabled && serverReachable) {
                                 addDebugLog('Retrying SSE connection...');
                                 connectSSE();
                             }
                         }, delay);
                     } else {
-                        addDebugLog('Max SSE reconnection attempts reached, giving up');
+                        addDebugLog('Max SSE reconnection attempts reached or server unreachable');
                         setConnectionStatus('error');
-                        setSseEnabled(false); // Disable SSE after max attempts
-                        startPolling(); // Fall back to polling
+                        setSseEnabled(false);
+                        startPolling();
                     }
                 };
 
@@ -235,33 +307,51 @@ export default function UsageDashboard() {
                 clearInterval(pollInterval);
             }
 
-            addDebugLog('Starting polling mode (30s intervals)');
+            if (!serverReachable) {
+                addDebugLog('Server unreachable, skipping polling');
+                setConnectionStatus('offline');
+                return;
+            }
+
+            addDebugLog('Starting polling mode (60s intervals)');
             setConnectionStatus('polling');
 
-            // Poll every 30 seconds
+            // Poll every 60 seconds (longer interval to reduce server load)
             pollInterval = setInterval(() => {
                 addDebugLog('Polling for updates...');
                 fetchUsage();
-            }, 30000);
+            }, 60000);
         };
 
-        const stopPolling = () => {
-            if (pollInterval) {
-                addDebugLog('Stopping polling');
-                clearInterval(pollInterval);
-                pollInterval = null;
-            }
+        const startHealthCheck = () => {
+            // Check server health every 2 minutes
+            healthCheckInterval = setInterval(async () => {
+                const wasReachable = serverReachable;
+                const isReachable = await checkServerHealth();
+                
+                if (!wasReachable && isReachable) {
+                    addDebugLog('Server came back online, restarting data fetch');
+                    fetchUsage();
+                } else if (wasReachable && !isReachable) {
+                    addDebugLog('Server went offline');
+                    setConnectionStatus('offline');
+                }
+            }, 120000);
         };
 
-        // Initial fetch
+        // Initial setup
+        addDebugLog('Dashboard initializing...');
         fetchUsage().then(() => {
-            if (sseEnabled) {
+            if (sseEnabled && serverReachable) {
                 addDebugLog('Initial fetch complete, starting SSE...');
                 connectSSE();
-            } else {
+            } else if (serverReachable) {
                 addDebugLog('Initial fetch complete, starting polling...');
                 startPolling();
             }
+            
+            // Start periodic health checks
+            startHealthCheck();
         });
 
         return () => {
@@ -276,38 +366,42 @@ export default function UsageDashboard() {
             if (pollInterval) {
                 clearInterval(pollInterval);
             }
+            if (healthCheckInterval) {
+                clearInterval(healthCheckInterval);
+            }
         };
     }, [sseEnabled]); // Re-run when SSE enabled/disabled
-
-    // Test server connectivity function
-    const testConnection = async () => {
-        addDebugLog('Testing server connection...');
-        try {
-            const response = await fetch('https://live-server1.com/health');
-            if (response.ok) {
-                addDebugLog('Server health check: OK');
-                const data = await response.json();
-                addDebugLog(`Server response: ${JSON.stringify(data)}`);
-            } else {
-                addDebugLog(`Server health check failed: ${response.status}`);
-            }
-        } catch (err) {
-            addDebugLog(`Server connection test failed: ${err.message}`);
-        }
-    };
 
     const handleRefresh = async () => {
         addDebugLog('Manual refresh triggered');
         setLoading(true);
         setError(null);
+        setRetryCount(prev => prev + 1);
+
+        const isReachable = await checkServerHealth();
+        
+        if (!isReachable) {
+            addDebugLog('Server unreachable during manual refresh');
+            setData(mockData);
+            setLastUpdated(new Date());
+            setConnectionStatus('offline');
+            setLoading(false);
+            return;
+        }
 
         try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
+
             const res = await fetch("https://live-server1.com/api/usage", {
+                signal: controller.signal,
                 headers: {
                     'Accept': 'application/json',
                     'Cache-Control': 'no-cache',
                 }
             });
+
+            clearTimeout(timeoutId);
 
             if (!res.ok) {
                 throw new Error(`HTTP ${res.status}: ${res.statusText}`);
@@ -317,6 +411,7 @@ export default function UsageDashboard() {
             setData(json);
             setLastUpdated(new Date());
             setError(null);
+            setRetryCount(0);
             addDebugLog('Manual refresh successful');
         } catch (err) {
             addDebugLog(`Manual refresh failed: ${err.message}`);
@@ -337,6 +432,9 @@ export default function UsageDashboard() {
             <div className="p-4 flex flex-col items-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mb-2"></div>
                 <p>Loading usage data...</p>
+                <p className="text-sm text-gray-500 mt-2">
+                    {serverReachable === false ? 'Server unreachable - will use offline mode' : 'Checking server connection...'}
+                </p>
 
                 {/* Debug Panel */}
                 <div className="mt-4 p-4 bg-gray-100 rounded-lg w-full max-w-2xl">
@@ -347,7 +445,7 @@ export default function UsageDashboard() {
                         ))}
                     </div>
                     <button
-                        onClick={testConnection}
+                        onClick={checkServerHealth}
                         className="mt-2 px-3 py-1 bg-blue-500 text-white text-sm rounded"
                     >
                         Test Server Connection
@@ -361,6 +459,9 @@ export default function UsageDashboard() {
         return (
             <div className="p-4 text-center">
                 <p className="text-red-500 mb-4">Error: {error}</p>
+                {retryCount > 0 && (
+                    <p className="text-sm text-gray-500 mb-4">Retry attempts: {retryCount}</p>
+                )}
 
                 {/* Debug Panel */}
                 <div className="mb-4 p-4 bg-gray-100 rounded-lg">
@@ -377,10 +478,10 @@ export default function UsageDashboard() {
                         onClick={handleRefresh}
                         className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
                     >
-                        Retry
+                        Retry ({retryCount > 0 ? `${retryCount} attempts` : 'Try Again'})
                     </button>
                     <button
-                        onClick={testConnection}
+                        onClick={checkServerHealth}
                         className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
                     >
                         Test Connection
@@ -417,6 +518,9 @@ export default function UsageDashboard() {
             case 'disconnected': return 'text-red-600';
             case 'error': return 'text-red-600';
             case 'polling': return 'text-blue-600';
+            case 'offline': return 'text-gray-600';
+            case 'fetching': return 'text-blue-600';
+            case 'checking': return 'text-yellow-600';
             default: return 'text-gray-600';
         }
     };
@@ -427,7 +531,10 @@ export default function UsageDashboard() {
             case 'connecting': return 'Connecting...';
             case 'disconnected': return 'Reconnecting...';
             case 'error': return 'Connection Error';
-            case 'polling': return 'Polling (30s)';
+            case 'polling': return 'Polling (60s)';
+            case 'offline': return 'Offline Mode';
+            case 'fetching': return 'Fetching...';
+            case 'checking': return 'Checking...';
             default: return 'Unknown';
         }
     };
@@ -438,12 +545,21 @@ export default function UsageDashboard() {
             <div className="flex justify-between items-center mb-4">
                 <h1 className="text-2xl font-bold">Usage Dashboard</h1>
                 <div className="flex items-center gap-4">
+                    {/* Server Status */}
+                    {serverReachable === false && (
+                        <div className="flex items-center gap-2 text-orange-600">
+                            <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                            <span className="text-sm font-medium">Server Offline</span>
+                        </div>
+                    )}
+
                     {/* Connection Status */}
                     <div className={`flex items-center gap-2 ${getConnectionStatusColor()}`}>
                         <div className={`w-2 h-2 rounded-full ${
                             connectionStatus === 'connected' ? 'bg-green-500' :
-                            connectionStatus === 'connecting' ? 'bg-yellow-500 animate-pulse' :
-                            connectionStatus === 'polling' ? 'bg-blue-500 animate-pulse' :
+                            connectionStatus === 'connecting' || connectionStatus === 'checking' ? 'bg-yellow-500 animate-pulse' :
+                            connectionStatus === 'polling' || connectionStatus === 'fetching' ? 'bg-blue-500 animate-pulse' :
+                            connectionStatus === 'offline' ? 'bg-gray-500' :
                             'bg-red-500'
                         }`}></div>
                         <span className="text-sm font-medium">{getConnectionStatusText()}</span>
@@ -457,17 +573,19 @@ export default function UsageDashboard() {
                         </div>
                     )}
 
-                    {/* SSE Toggle Button */}
-                    <button
-                        onClick={toggleSSE}
-                        className={`px-3 py-1 text-sm rounded transition-colors ${
-                            sseEnabled
-                                ? 'bg-red-500 text-white hover:bg-red-600'
-                                : 'bg-green-500 text-white hover:bg-green-600'
-                        }`}
-                    >
-                        {sseEnabled ? 'Disable SSE' : 'Enable SSE'}
-                    </button>
+                    {/* SSE Toggle Button - only show if server is reachable */}
+                    {serverReachable && (
+                        <button
+                            onClick={toggleSSE}
+                            className={`px-3 py-1 text-sm rounded transition-colors ${
+                                sseEnabled
+                                    ? 'bg-red-500 text-white hover:bg-red-600'
+                                    : 'bg-green-500 text-white hover:bg-green-600'
+                            }`}
+                        >
+                            {sseEnabled ? 'Disable SSE' : 'Enable SSE'}
+                        </button>
+                    )}
 
                     {/* Manual Refresh Button */}
                     <button
@@ -486,10 +604,18 @@ export default function UsageDashboard() {
                 </div>
             </div>
 
+            {/* Offline Mode Banner */}
+            {connectionStatus === 'offline' && (
+                <div className="bg-orange-100 border-l-4 border-orange-500 text-orange-700 p-4 mb-4">
+                    <p className="font-bold">Offline Mode</p>
+                    <p>Server is unreachable. Showing empty dashboard. Data will update when server comes back online.</p>
+                </div>
+            )}
+
             {/* Debug Panel (collapsible) */}
             <details className="mb-4">
                 <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-800">
-                    Debug Information ({debugInfo.length} logs)
+                    Debug Information ({debugInfo.length} logs) {retryCount > 0 && `- ${retryCount} retries`}
                 </summary>
                 <div className="mt-2 p-3 bg-gray-50 rounded text-xs space-y-1 max-h-32 overflow-y-auto">
                     {debugInfo.map((log, index) => (
@@ -506,6 +632,7 @@ export default function UsageDashboard() {
                 </div>
             )}
 
+            {/* Rest of your dashboard components remain the same */}
             {/* Metrics */}
             <div className="flex flex-wrap gap-4">
                 <div className={`${cardStyle} flex-1 border-l-4 border-green-500`}>
@@ -558,7 +685,7 @@ export default function UsageDashboard() {
                 </div>
             </div>
 
-            {/* Recent Uploads */}
+            {/* Recent sections with empty state handling */}
             <div className="flex flex-col gap-4">
                 <p className="text-lg font-semibold mb-2">Recent Uploads</p>
                 {recentUploads && recentUploads.length > 0 ? recentUploads.map(u => (
@@ -573,11 +700,12 @@ export default function UsageDashboard() {
                         <div className="text-xs text-gray-400 mt-1">{new Date(u.timestamp || u.createdAt).toLocaleString()}</div>
                     </div>
                 )) : (
-                    <p className="text-gray-500">No recent uploads</p>
+                    <p className="text-gray-500">
+                        {connectionStatus === 'offline' ? 'No data available (offline mode)' : 'No recent uploads'}
+                    </p>
                 )}
             </div>
 
-            {/* Recent Queries */}
             <div className="flex flex-col gap-4">
                 <p className="text-lg font-semibold mb-2">Recent Queries</p>
                 {recentQueries && recentQueries.length > 0 ? recentQueries.map(q => (
@@ -590,11 +718,12 @@ export default function UsageDashboard() {
                         <div className="text-xs text-gray-400 mt-1">{new Date(q.timestamp || q.createdAt).toLocaleString()}</div>
                     </div>
                 )) : (
-                    <p className="text-gray-500">No recent queries</p>
+                    <p className="text-gray-500">
+                        {connectionStatus === 'offline' ? 'No data available (offline mode)' : 'No recent queries'}
+                    </p>
                 )}
             </div>
 
-            {/* Recent IPs */}
             <div className="flex flex-col gap-4">
                 <p className="text-lg font-semibold mb-2">Recent IPs / User Agents</p>
                 {recentIPs && recentIPs.length > 0 ? recentIPs.map(ip => (
@@ -604,7 +733,9 @@ export default function UsageDashboard() {
                         <div className="text-xs text-gray-400 mt-1">{new Date(ip.createdAt).toLocaleString()}</div>
                     </div>
                 )) : (
-                    <p className="text-gray-500">No recent IP data</p>
+                    <p className="text-gray-500">
+                        {connectionStatus === 'offline' ? 'No data available (offline mode)' : 'No recent IP data'}
+                    </p>
                 )}
             </div>
         </div>
