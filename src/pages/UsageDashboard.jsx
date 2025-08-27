@@ -17,115 +17,245 @@ export default function UsageDashboard() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [lastUpdated, setLastUpdated] = useState(null);
-    const [isLiveUpdate, setIsLiveUpdate] = useState(false); // New state for live indicator
+    const [isLiveUpdate, setIsLiveUpdate] = useState(false);
+    const [connectionStatus, setConnectionStatus] = useState('connecting'); // New state for connection status
 
     const { user } = useAuth();
     const { theme } = useContext(ThemeContext);
 
     useEffect(() => {
         let evtSource;
+        let fetchRetryCount = 0;
+        const maxRetries = 3;
 
         async function fetchUsage() {
             try {
-                const res = await fetch("https://live-server1.com/api/usage");
+                setError(null); // Clear previous errors
+                console.log('Fetching usage data...');
+                
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+                
+                const res = await fetch("https://live-server1.com/api/usage", {
+                    signal: controller.signal,
+                    headers: {
+                        'Cache-Control': 'no-cache',
+                        'Accept': 'application/json',
+                    }
+                });
+                
+                clearTimeout(timeoutId);
+                
+                if (!res.ok) {
+                    throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                }
+                
                 const text = await res.text();
                 let json;
                 try {
                     json = JSON.parse(text);
-                } catch {
-                    throw new Error(`Expected JSON but received: ${text.substring(0, 200)}`);
+                } catch (parseError) {
+                    throw new Error(`Invalid JSON response: ${text.substring(0, 200)}`);
                 }
-                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                
                 setData(json);
                 setLastUpdated(new Date());
+                setError(null);
+                fetchRetryCount = 0; // Reset retry count on success
+                console.log('Usage data fetched successfully');
+                
             } catch (err) {
                 console.error("Usage fetch error:", err);
-                setError(err.message);
+                
+                if (err.name === 'AbortError') {
+                    setError('Request timeout - server may be slow');
+                } else if (err.message.includes('Failed to fetch')) {
+                    setError('Network error - check your connection');
+                } else {
+                    setError(err.message);
+                }
+                
+                // Retry logic for initial fetch
+                if (fetchRetryCount < maxRetries && loading) {
+                    fetchRetryCount++;
+                    console.log(`Retrying fetch (${fetchRetryCount}/${maxRetries}) in 2 seconds...`);
+                    setTimeout(() => fetchUsage(), 2000);
+                    return;
+                }
             } finally {
                 setLoading(false);
             }
         }
 
         const connectSSE = () => {
-            evtSource = new EventSource('https://live-server1.com/events');
-
-            evtSource.onopen = () => {
-                console.log('SSE connected');
-            };
-
-            // Show live indicator and hide after 3 seconds
-            const showLiveIndicator = () => {
-                setIsLiveUpdate(true);
-                setTimeout(() => setIsLiveUpdate(false), 3000);
-            };
-
-            evtSource.addEventListener('upload', e => {
-                const eventData = JSON.parse(e.data);
-                showLiveIndicator();
+            try {
+                console.log('Connecting to SSE...');
+                setConnectionStatus('connecting');
                 
-                setData(prev => {
-                    if (!prev) return prev;
+                evtSource = new EventSource('https://live-server1.com/events');
 
-                    const totalUploads = prev.metrics.totalUploads + 1;
-                    const failedUploads = prev.metrics.failedUploads + (eventData.success ? 0 : 1);
+                evtSource.onopen = () => {
+                    console.log('SSE connected successfully');
+                    setConnectionStatus('connected');
+                };
 
-                    return {
-                        ...prev,
-                        metrics: { ...prev.metrics, totalUploads, failedUploads },
-                        recentUploads: [eventData, ...prev.recentUploads].slice(0, 50),
-                    };
+                // Show live indicator and hide after 3 seconds
+                const showLiveIndicator = () => {
+                    setIsLiveUpdate(true);
+                    setTimeout(() => setIsLiveUpdate(false), 3000);
+                };
+
+                evtSource.addEventListener('upload', e => {
+                    try {
+                        const eventData = JSON.parse(e.data);
+                        showLiveIndicator();
+                        
+                        setData(prev => {
+                            if (!prev) return prev;
+
+                            const totalUploads = prev.metrics.totalUploads + 1;
+                            const failedUploads = prev.metrics.failedUploads + (eventData.success ? 0 : 1);
+
+                            return {
+                                ...prev,
+                                metrics: { ...prev.metrics, totalUploads, failedUploads },
+                                recentUploads: [eventData, ...prev.recentUploads].slice(0, 50),
+                            };
+                        });
+                        setLastUpdated(new Date());
+                    } catch (err) {
+                        console.error('Error processing upload event:', err);
+                    }
                 });
-                setLastUpdated(new Date());
-            });
 
-            evtSource.addEventListener('query', e => {
-                const eventData = JSON.parse(e.data);
-                showLiveIndicator();
-                
-                setData(prev => {
-                    if (!prev) return prev;
+                evtSource.addEventListener('query', e => {
+                    try {
+                        const eventData = JSON.parse(e.data);
+                        showLiveIndicator();
+                        
+                        setData(prev => {
+                            if (!prev) return prev;
 
-                    const totalQueries = prev.metrics.totalQueries + 1;
-                    const failedQueries = prev.metrics.failedQueries + (eventData.success ? 0 : 1);
+                            const totalQueries = prev.metrics.totalQueries + 1;
+                            const failedQueries = prev.metrics.failedQueries + (eventData.success ? 0 : 1);
 
-                    return {
-                        ...prev,
-                        metrics: { ...prev.metrics, totalQueries, failedQueries },
-                        recentQueries: [eventData, ...prev.recentQueries].slice(0, 50),
-                    };
+                            return {
+                                ...prev,
+                                metrics: { ...prev.metrics, totalQueries, failedQueries },
+                                recentQueries: [eventData, ...prev.recentQueries].slice(0, 50),
+                            };
+                        });
+                        setLastUpdated(new Date());
+                    } catch (err) {
+                        console.error('Error processing query event:', err);
+                    }
                 });
-                setLastUpdated(new Date());
-            });
 
-            // Handle any database change event
-            evtSource.addEventListener('database_change', e => {
-                showLiveIndicator();
-                // Refetch all data when major changes occur
-                fetchUsage();
-            });
+                evtSource.addEventListener('database_change', e => {
+                    try {
+                        showLiveIndicator();
+                        fetchUsage(); // Refetch all data
+                    } catch (err) {
+                        console.error('Error processing database_change event:', err);
+                    }
+                });
 
-            evtSource.onerror = (err) => {
-                console.error('SSE error:', err);
-                evtSource.close();
+                evtSource.addEventListener('heartbeat', e => {
+                    // Just log heartbeat, don't show live indicator
+                    console.log('SSE heartbeat received');
+                });
+
+                evtSource.onerror = (err) => {
+                    console.error('SSE error:', err);
+                    setConnectionStatus('disconnected');
+                    
+                    if (evtSource) {
+                        evtSource.close();
+                    }
+                    
+                    // Reconnect after 5 seconds
+                    setTimeout(() => {
+                        console.log('Attempting to reconnect SSE...');
+                        connectSSE();
+                    }, 5000);
+                };
+
+            } catch (err) {
+                console.error('Error setting up SSE:', err);
+                setConnectionStatus('error');
                 
-                // Reconnect after 5 seconds
+                // Retry SSE connection after 10 seconds
                 setTimeout(() => {
-                    console.log('Attempting to reconnect SSE...');
+                    console.log('Retrying SSE connection...');
                     connectSSE();
-                }, 5000);
-            };
+                }, 10000);
+            }
         };
 
+        // Start both fetch and SSE
         fetchUsage();
         connectSSE();
 
         return () => {
-            if (evtSource) evtSource.close();
+            if (evtSource) {
+                console.log('Closing SSE connection');
+                evtSource.close();
+            }
         };
     }, []);
 
-    if (loading) return <p className="p-4">Loading usage data...</p>;
-    if (error) return <p className="p-4 text-red-500">Error: {error}</p>;
+    // Manual refresh function
+    const handleRefresh = async () => {
+        setLoading(true);
+        setError(null);
+        
+        try {
+            const res = await fetch("https://live-server1.com/api/usage", {
+                headers: {
+                    'Cache-Control': 'no-cache',
+                    'Accept': 'application/json',
+                }
+            });
+            
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+            }
+            
+            const json = await res.json();
+            setData(json);
+            setLastUpdated(new Date());
+            setError(null);
+        } catch (err) {
+            console.error("Manual refresh error:", err);
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (loading && !data) {
+        return (
+            <div className="p-4 flex flex-col items-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mb-2"></div>
+                <p>Loading usage data...</p>
+            </div>
+        );
+    }
+
+    if (error && !data) {
+        return (
+            <div className="p-4 text-center">
+                <p className="text-red-500 mb-4">Error: {error}</p>
+                <button 
+                    onClick={handleRefresh}
+                    className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                >
+                    Retry
+                </button>
+            </div>
+        );
+    }
+
     if (!data) return null;
 
     const { metrics, recentUploads, recentQueries, recentIPs } = data;
@@ -146,12 +276,43 @@ export default function UsageDashboard() {
 
     const cardStyle = 'bg-white dark:bg-gray-800 rounded-lg shadow p-4 hover:shadow-lg transition-shadow';
 
+    // Connection status indicator
+    const getConnectionStatusColor = () => {
+        switch (connectionStatus) {
+            case 'connected': return 'text-green-600';
+            case 'connecting': return 'text-yellow-600';
+            case 'disconnected': return 'text-red-600';
+            case 'error': return 'text-red-600';
+            default: return 'text-gray-600';
+        }
+    };
+
+    const getConnectionStatusText = () => {
+        switch (connectionStatus) {
+            case 'connected': return 'Live';
+            case 'connecting': return 'Connecting...';
+            case 'disconnected': return 'Reconnecting...';
+            case 'error': return 'Connection Error';
+            default: return 'Unknown';
+        }
+    };
+
     return (
         <div className={`p-6 space-y-6 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
             {/* Header with Live Update Indicator */}
             <div className="flex justify-between items-center mb-4">
                 <h1 className="text-2xl font-bold">Usage Dashboard</h1>
                 <div className="flex items-center gap-4">
+                    {/* Connection Status */}
+                    <div className={`flex items-center gap-2 ${getConnectionStatusColor()}`}>
+                        <div className={`w-2 h-2 rounded-full ${
+                            connectionStatus === 'connected' ? 'bg-green-500' : 
+                            connectionStatus === 'connecting' ? 'bg-yellow-500 animate-pulse' : 
+                            'bg-red-500'
+                        }`}></div>
+                        <span className="text-sm font-medium">{getConnectionStatusText()}</span>
+                    </div>
+
                     {/* Live Update Indicator */}
                     {isLiveUpdate && (
                         <div className="flex items-center gap-2 text-green-600 animate-pulse">
@@ -159,6 +320,16 @@ export default function UsageDashboard() {
                             <span className="text-sm font-medium">Live Update</span>
                         </div>
                     )}
+
+                    {/* Manual Refresh Button */}
+                    <button 
+                        onClick={handleRefresh}
+                        disabled={loading}
+                        className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 transition-colors"
+                    >
+                        {loading ? 'Refreshing...' : 'Refresh'}
+                    </button>
+
                     {lastUpdated && (
                         <p className="text-sm text-gray-500 dark:text-gray-300">
                             Updated: {lastUpdated.toLocaleTimeString()}
@@ -166,6 +337,14 @@ export default function UsageDashboard() {
                     )}
                 </div>
             </div>
+
+            {/* Error Banner */}
+            {error && data && (
+                <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4">
+                    <p className="font-bold">Warning</p>
+                    <p>{error}</p>
+                </div>
+            )}
 
             {/* Rest of your existing JSX remains the same */}
             {/* Metrics */}
@@ -223,7 +402,7 @@ export default function UsageDashboard() {
             {/* Recent Uploads */}
             <div className="flex flex-col gap-4">
                 <p className="text-lg font-semibold mb-2">Recent Uploads</p>
-                {recentUploads.map(u => (
+                {recentUploads && recentUploads.length > 0 ? recentUploads.map(u => (
                     <div key={u.chunkId + u.timestamp} className={cardStyle}>
                         <div className="flex justify-between items-center mb-1">
                             <span className="font-mono text-sm truncate">{u.chunkId}</span>
@@ -234,13 +413,15 @@ export default function UsageDashboard() {
                         <div className="text-xs text-gray-500 dark:text-gray-300 truncate">UA: {u.userAgent}</div>
                         <div className="text-xs text-gray-400 mt-1">{new Date(u.timestamp || u.createdAt).toLocaleString()}</div>
                     </div>
-                ))}
+                )) : (
+                    <p className="text-gray-500">No recent uploads</p>
+                )}
             </div>
 
             {/* Recent Queries */}
             <div className="flex flex-col gap-4">
                 <p className="text-lg font-semibold mb-2">Recent Queries</p>
-                {recentQueries.map(q => (
+                {recentQueries && recentQueries.length > 0 ? recentQueries.map(q => (
                     <div key={q.segmentId + q.timestamp} className={cardStyle}>
                         <div className="flex justify-between items-center mb-1">
                             <span className="font-mono text-sm truncate">UserID: {q.userId}</span>
@@ -249,19 +430,23 @@ export default function UsageDashboard() {
                         <div className="text-xs text-gray-500 dark:text-gray-300 truncate">SegmentID: {q.segmentId}</div>
                         <div className="text-xs text-gray-400 mt-1">{new Date(q.timestamp || q.createdAt).toLocaleString()}</div>
                     </div>
-                ))}
+                )) : (
+                    <p className="text-gray-500">No recent queries</p>
+                )}
             </div>
 
             {/* Recent IPs */}
             <div className="flex flex-col gap-4">
                 <p className="text-lg font-semibold mb-2">Recent IPs / User Agents</p>
-                {recentIPs.map(ip => (
+                {recentIPs && recentIPs.length > 0 ? recentIPs.map(ip => (
                     <div key={ip.createdAt} className={cardStyle}>
                         <div className="font-mono text-sm">{ip.ipAddress}</div>
                         <div className="text-xs text-gray-500 dark:text-gray-300 truncate">{ip.userAgent}</div>
                         <div className="text-xs text-gray-400 mt-1">{new Date(ip.createdAt).toLocaleString()}</div>
                     </div>
-                ))}
+                )) : (
+                    <p className="text-gray-500">No recent IP data</p>
+                )}
             </div>
         </div>
     );
