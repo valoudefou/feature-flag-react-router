@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext, useMemo, useRef } from 'react';
+import { useState, useEffect, useContext, useMemo, useRef, useCallback } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { ThemeContext } from '../App';
 import {
@@ -21,23 +21,28 @@ export default function UsageDashboard() {
     const [debugInfo, setDebugInfo] = useState([]);
     const [serverReachable, setServerReachable] = useState(null);
     const [retryCount, setRetryCount] = useState(0);
-
-    // New filter states
     const [uploadFilter, setUploadFilter] = useState('all');
     const [activeTab, setActiveTab] = useState('uploads');
 
     const { user } = useAuth();
     const { theme } = useContext(ThemeContext);
 
-    // Add ref to track if component is mounted
+    // Refs to track intervals and prevent stale closures
+    const pollIntervalRef = useRef(null);
+    const healthCheckIntervalRef = useRef(null);
     const isInitialMount = useRef(true);
+    const currentFilterRef = useRef('all'); // Track current filter
 
-    // MOVED: displayUploads useMemo hook to the top, right after state and context
+    // Update filter ref whenever uploadFilter changes
+    useEffect(() => {
+        currentFilterRef.current = uploadFilter;
+        console.log('uploadFilter state changed to:', uploadFilter);
+    }, [uploadFilter]);
+
     const displayUploads = useMemo(() => {
         console.log('=== RENDER DEBUG ===');
         console.log('uploadFilter state:', uploadFilter);
         
-        // Handle case when data is not loaded yet
         if (!data?.recentUploads) {
             console.log('No data available yet');
             return [];
@@ -47,7 +52,7 @@ export default function UsageDashboard() {
         console.log('recentUploads length:', recentUploads?.length);
         console.log('recentUploads data:', recentUploads?.map(u => ({ id: u.id, success: u.success })));
         
-        // Apply client-side filtering as backup to ensure correct display
+        // Apply client-side filtering as backup
         switch (uploadFilter) {
             case 'failed':
                 const failed = recentUploads.filter(upload => upload.success === false);
@@ -62,11 +67,7 @@ export default function UsageDashboard() {
         }
     }, [data?.recentUploads, uploadFilter]);
 
-    useEffect(() => {
-        console.log('uploadFilter state changed to:', uploadFilter);
-    }, [uploadFilter]);
-
-    // Mock data for when server is unreachable
+    // Mock data for offline mode
     const mockData = {
         metrics: {
             totalUploads: 0,
@@ -83,17 +84,16 @@ export default function UsageDashboard() {
         }
     };
 
-    // Add debug logging function
-    const addDebugLog = (message) => {
+    const addDebugLog = useCallback((message) => {
         const timestamp = new Date().toLocaleTimeString();
         setDebugInfo(prev => [`[${timestamp}] ${message}`, ...prev.slice(0, 9)]);
         console.log(`[Dashboard] ${message}`);
-    };
+    }, []);
 
-    // Fetch data with filters
-    const checkServerByFetchingData = async (filters = {}) => {
+    // FIXED: Memoized fetch function to prevent recreating on every render
+    const checkServerByFetchingData = useCallback(async (filters = {}) => {
         const queryParams = new URLSearchParams({
-            uploadFilter: filters.uploadFilter || uploadFilter,
+            uploadFilter: filters.uploadFilter || currentFilterRef.current,
             limit: '50'
         });
 
@@ -126,10 +126,10 @@ export default function UsageDashboard() {
             setServerReachable(false);
             return { reachable: false, data: null };
         }
-    };
+    }, [addDebugLog]);
 
-    // Fetch usage data
-    const fetchUsage = async (filters = {}) => {
+    // FIXED: Memoized fetch function
+    const fetchUsage = useCallback(async (filters = {}) => {
         addDebugLog('Starting fetch...');
         setError(null);
 
@@ -149,7 +149,7 @@ export default function UsageDashboard() {
             setConnectionStatus('online');
             setData(result.data);
             console.log('=== FRONTEND DEBUG ===');
-            console.log('Filter requested:', filters.uploadFilter || uploadFilter);
+            console.log('Filter requested:', filters.uploadFilter || currentFilterRef.current);
             console.log('Server response uploads:', result.data.recentUploads);
             console.log('Upload success distribution:', {
                 total: result.data.recentUploads?.length || 0,
@@ -172,68 +172,60 @@ export default function UsageDashboard() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [addDebugLog, checkServerByFetchingData, uploadFilter]);
 
+    // FIXED: Separate function to clear intervals
+    const clearIntervals = useCallback(() => {
+        if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+        }
+        if (healthCheckIntervalRef.current) {
+            clearInterval(healthCheckIntervalRef.current);
+            healthCheckIntervalRef.current = null;
+        }
+    }, []);
 
-// Handle filter changes
-const handleUploadFilterChange = (newFilter) => {
-    console.log('Filter change requested:', newFilter);
-    
-    // Update state first
-    setUploadFilter(newFilter);
-    setLoading(true);
+    // FIXED: Separate function to start polling
+    const startPolling = useCallback(() => {
+        clearIntervals();
 
-    // Use setTimeout to ensure state update has been processed
-    setTimeout(() => {
-        fetchUsage({ uploadFilter: newFilter });
-    }, 0);
-};
+        if (!serverReachable) {
+            addDebugLog('Server unreachable, skipping polling');
+            setConnectionStatus('offline');
+            return;
+        }
 
+        addDebugLog('Starting polling mode (60s intervals)');
+        setConnectionStatus('polling');
 
-    // FIXED: Separate the initial load from filter changes
-    useEffect(() => {
-        let pollInterval;
-        let healthCheckInterval;
+        pollIntervalRef.current = setInterval(() => {
+            addDebugLog('Polling for updates...');
+            // Use the current filter from ref to avoid stale closure
+            fetchUsage({ uploadFilter: currentFilterRef.current });
+        }, 60000);
+    }, [serverReachable, addDebugLog, fetchUsage, clearIntervals]);
 
-        const startPolling = () => {
-            if (pollInterval) {
-                clearInterval(pollInterval);
-            }
+    // FIXED: Separate function to start health check
+    const startHealthCheck = useCallback(() => {
+        healthCheckIntervalRef.current = setInterval(async () => {
+            const wasReachable = serverReachable;
+            const result = await checkServerByFetchingData({ uploadFilter: currentFilterRef.current });
 
-            if (!serverReachable) {
-                addDebugLog('Server unreachable, skipping polling');
+            if (!wasReachable && result.reachable) {
+                addDebugLog('Server came back online, updating data');
+                setData(result.data);
+                setLastUpdated(new Date());
+                setConnectionStatus('online');
+            } else if (wasReachable && !result.reachable) {
+                addDebugLog('Server went offline');
                 setConnectionStatus('offline');
-                return;
             }
+        }, 120000);
+    }, [serverReachable, checkServerByFetchingData, addDebugLog]);
 
-            addDebugLog('Starting polling mode (60s intervals)');
-            setConnectionStatus('polling');
-
-            pollInterval = setInterval(() => {
-                addDebugLog('Polling for updates...');
-                // Use the current uploadFilter state for polling
-                fetchUsage({ uploadFilter });
-            }, 60000);
-        };
-
-        const startHealthCheck = () => {
-            healthCheckInterval = setInterval(async () => {
-                const wasReachable = serverReachable;
-                const result = await checkServerByFetchingData({ uploadFilter });
-
-                if (!wasReachable && result.reachable) {
-                    addDebugLog('Server came back online, updating data');
-                    setData(result.data);
-                    setLastUpdated(new Date());
-                    setConnectionStatus('online');
-                } else if (wasReachable && !result.reachable) {
-                    addDebugLog('Server went offline');
-                    setConnectionStatus('offline');
-                }
-            }, 120000);
-        };
-
-        // ONLY run initial setup on first mount
+    // FIXED: Simplified useEffect for initial load only
+    useEffect(() => {
         if (isInitialMount.current) {
             addDebugLog('Dashboard initializing...');
             fetchUsage({ uploadFilter: 'all' }).then(() => {
@@ -244,30 +236,38 @@ const handleUploadFilterChange = (newFilter) => {
                 startHealthCheck();
             });
             isInitialMount.current = false;
-        } else {
-            // For subsequent filter changes, just restart polling with new filter
-            if (serverReachable) {
-                startPolling();
-            }
         }
 
         return () => {
-            if (pollInterval) {
-                clearInterval(pollInterval);
-            }
-            if (healthCheckInterval) {
-                clearInterval(healthCheckInterval);
-            }
+            clearIntervals();
         };
-    }, [uploadFilter, serverReachable]); // Keep uploadFilter as dependency but handle it properly
+    }, []); // REMOVED uploadFilter from dependencies
 
-    const handleRefresh = async () => {
+    // FIXED: Separate useEffect for handling filter changes after initial load
+    useEffect(() => {
+        if (!isInitialMount.current && serverReachable) {
+            addDebugLog(`Filter changed to: ${uploadFilter}, restarting polling`);
+            startPolling();
+        }
+    }, [uploadFilter, serverReachable, startPolling, addDebugLog]);
+
+    // FIXED: Simplified filter change handler
+    const handleUploadFilterChange = useCallback((newFilter) => {
+        console.log('Filter change requested:', newFilter);
+        setUploadFilter(newFilter);
+        setLoading(true);
+        
+        // Fetch immediately with new filter
+        fetchUsage({ uploadFilter: newFilter });
+    }, [fetchUsage]);
+
+    const handleRefresh = useCallback(async () => {
         addDebugLog('Manual refresh triggered');
         setLoading(true);
         setError(null);
         setRetryCount(prev => prev + 1);
-        await fetchUsage({ uploadFilter });
-    };
+        await fetchUsage({ uploadFilter: currentFilterRef.current });
+    }, [addDebugLog, fetchUsage]);
 
     // Rest of your component remains the same...
     if (loading && !data) {
