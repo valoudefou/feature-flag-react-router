@@ -18,8 +18,9 @@ export default function UsageDashboard() {
     const [error, setError] = useState(null);
     const [lastUpdated, setLastUpdated] = useState(null);
     const [isLiveUpdate, setIsLiveUpdate] = useState(false);
-    const [connectionStatus, setConnectionStatus] = useState('disconnected');
-    const [debugInfo, setDebugInfo] = useState([]); // Add debug info
+    const [connectionStatus, setConnectionStatus] = useState('polling');
+    const [debugInfo, setDebugInfo] = useState([]);
+    const [sseEnabled, setSseEnabled] = useState(false); // Start with SSE disabled
 
     const { user } = useAuth();
     const { theme } = useContext(ThemeContext);
@@ -34,23 +35,23 @@ export default function UsageDashboard() {
     useEffect(() => {
         let evtSource;
         let retryTimeout;
+        let pollInterval;
 
         async function fetchUsage() {
             addDebugLog('Starting fetch...');
-            setLoading(true);
+            if (!loading) setLoading(true);
             setError(null);
 
             try {
-                // First, let's test if the server is reachable
-                addDebugLog('Testing server connectivity...');
+                addDebugLog('Fetching from server...');
 
                 const res = await fetch("https://live-server1.com/api/usage", {
                     method: 'GET',
                     headers: {
                         'Accept': 'application/json',
                         'Content-Type': 'application/json',
+                        'Cache-Control': 'no-cache',
                     },
-                    // Remove timeout for now to see if it's a timeout issue
                 });
 
                 addDebugLog(`Server responded with status: ${res.status}`);
@@ -79,7 +80,6 @@ export default function UsageDashboard() {
                 addDebugLog(`Fetch error: ${err.message}`);
                 console.error("Usage fetch error:", err);
 
-                // More specific error messages
                 if (err.name === 'TypeError' && err.message.includes('Failed to fetch')) {
                     setError('Cannot connect to server - check if https://live-server1.com is running');
                 } else if (err.name === 'AbortError') {
@@ -93,7 +93,12 @@ export default function UsageDashboard() {
         }
 
         const connectSSE = () => {
-            // Clear any existing connection and timeout
+            if (!sseEnabled) {
+                addDebugLog('SSE is disabled, skipping connection');
+                return;
+            }
+
+            // Clear any existing connection
             if (evtSource) {
                 addDebugLog('Closing existing SSE connection');
                 evtSource.close();
@@ -111,10 +116,13 @@ export default function UsageDashboard() {
             try {
                 evtSource = new EventSource('https://live-server1.com/events');
                 let connectionEstablished = false;
+                let reconnectAttempts = 0;
+                const maxReconnectAttempts = 3;
 
                 evtSource.onopen = () => {
                     addDebugLog('SSE connection opened');
                     connectionEstablished = true;
+                    reconnectAttempts = 0;
                     setConnectionStatus('connected');
                 };
 
@@ -125,7 +133,7 @@ export default function UsageDashboard() {
                 });
 
                 evtSource.addEventListener('heartbeat', e => {
-                    // Heartbeat received - connection is alive
+                    addDebugLog('SSE heartbeat received');
                     if (!connectionEstablished) {
                         connectionEstablished = true;
                         setConnectionStatus('connected');
@@ -186,53 +194,90 @@ export default function UsageDashboard() {
                 });
 
                 evtSource.onerror = (err) => {
-                    addDebugLog(`SSE error - ReadyState: ${evtSource?.readyState}`);
+                    addDebugLog(`SSE error - ReadyState: ${evtSource?.readyState}, Attempts: ${reconnectAttempts}`);
                     setConnectionStatus('disconnected');
 
-                    // Only reconnect if we had established a connection before
-                    if (connectionEstablished) {
-                        addDebugLog('Connection was established before error, will reconnect');
+                    if (evtSource) {
+                        evtSource.close();
+                        evtSource = null;
+                    }
 
-                        if (evtSource) {
-                            evtSource.close();
-                            evtSource = null;
-                        }
-
-                        // Wait before reconnecting
+                    // Only reconnect if we haven't exceeded max attempts
+                    if (reconnectAttempts < maxReconnectAttempts) {
+                        reconnectAttempts++;
+                        const delay = Math.min(5000 * reconnectAttempts, 30000); // Exponential backoff, max 30s
+                        addDebugLog(`Will retry SSE connection in ${delay/1000}s (attempt ${reconnectAttempts}/${maxReconnectAttempts})`);
+                        
                         retryTimeout = setTimeout(() => {
-                            addDebugLog('Retrying SSE connection after error...');
-                            connectSSE();
-                        }, 10000); // 10 seconds
+                            if (sseEnabled) {
+                                addDebugLog('Retrying SSE connection...');
+                                connectSSE();
+                            }
+                        }, delay);
                     } else {
-                        addDebugLog('Connection never established, stopping reconnection attempts');
+                        addDebugLog('Max SSE reconnection attempts reached, giving up');
                         setConnectionStatus('error');
+                        setSseEnabled(false); // Disable SSE after max attempts
+                        startPolling(); // Fall back to polling
                     }
                 };
 
             } catch (err) {
                 addDebugLog(`SSE setup error: ${err.message}`);
                 setConnectionStatus('error');
+                setSseEnabled(false);
+                startPolling();
             }
         };
 
-        // Start with fetch only, then SSE
+        const startPolling = () => {
+            if (pollInterval) {
+                clearInterval(pollInterval);
+            }
+
+            addDebugLog('Starting polling mode (30s intervals)');
+            setConnectionStatus('polling');
+
+            // Poll every 30 seconds
+            pollInterval = setInterval(() => {
+                addDebugLog('Polling for updates...');
+                fetchUsage();
+            }, 30000);
+        };
+
+        const stopPolling = () => {
+            if (pollInterval) {
+                addDebugLog('Stopping polling');
+                clearInterval(pollInterval);
+                pollInterval = null;
+            }
+        };
+
+        // Initial fetch
         fetchUsage().then(() => {
-            // Only try SSE if fetch was successful
-            if (!error) {
+            if (sseEnabled) {
+                addDebugLog('Initial fetch complete, starting SSE...');
                 connectSSE();
+            } else {
+                addDebugLog('Initial fetch complete, starting polling...');
+                startPolling();
             }
         });
 
         return () => {
+            addDebugLog('Component unmounting, cleaning up');
+            
             if (evtSource) {
-                addDebugLog('Closing SSE connection');
                 evtSource.close();
             }
             if (retryTimeout) {
                 clearTimeout(retryTimeout);
             }
+            if (pollInterval) {
+                clearInterval(pollInterval);
+            }
         };
-    }, []);
+    }, [sseEnabled]); // Re-run when SSE enabled/disabled
 
     // Test server connectivity function
     const testConnection = async () => {
@@ -260,6 +305,7 @@ export default function UsageDashboard() {
             const res = await fetch("https://live-server1.com/api/usage", {
                 headers: {
                     'Accept': 'application/json',
+                    'Cache-Control': 'no-cache',
                 }
             });
 
@@ -278,6 +324,12 @@ export default function UsageDashboard() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const toggleSSE = () => {
+        const newState = !sseEnabled;
+        setSseEnabled(newState);
+        addDebugLog(`SSE ${newState ? 'enabled' : 'disabled'} by user`);
     };
 
     if (loading && !data) {
@@ -364,16 +416,18 @@ export default function UsageDashboard() {
             case 'connecting': return 'text-yellow-600';
             case 'disconnected': return 'text-red-600';
             case 'error': return 'text-red-600';
+            case 'polling': return 'text-blue-600';
             default: return 'text-gray-600';
         }
     };
 
     const getConnectionStatusText = () => {
         switch (connectionStatus) {
-            case 'connected': return 'Live';
+            case 'connected': return 'Live (SSE)';
             case 'connecting': return 'Connecting...';
             case 'disconnected': return 'Reconnecting...';
             case 'error': return 'Connection Error';
+            case 'polling': return 'Polling (30s)';
             default: return 'Unknown';
         }
     };
@@ -386,10 +440,12 @@ export default function UsageDashboard() {
                 <div className="flex items-center gap-4">
                     {/* Connection Status */}
                     <div className={`flex items-center gap-2 ${getConnectionStatusColor()}`}>
-                        <div className={`w-2 h-2 rounded-full ${connectionStatus === 'connected' ? 'bg-green-500' :
+                        <div className={`w-2 h-2 rounded-full ${
+                            connectionStatus === 'connected' ? 'bg-green-500' :
                             connectionStatus === 'connecting' ? 'bg-yellow-500 animate-pulse' :
-                                'bg-red-500'
-                            }`}></div>
+                            connectionStatus === 'polling' ? 'bg-blue-500 animate-pulse' :
+                            'bg-red-500'
+                        }`}></div>
                         <span className="text-sm font-medium">{getConnectionStatusText()}</span>
                     </div>
 
@@ -400,6 +456,18 @@ export default function UsageDashboard() {
                             <span className="text-sm font-medium">Live Update</span>
                         </div>
                     )}
+
+                    {/* SSE Toggle Button */}
+                    <button
+                        onClick={toggleSSE}
+                        className={`px-3 py-1 text-sm rounded transition-colors ${
+                            sseEnabled
+                                ? 'bg-red-500 text-white hover:bg-red-600'
+                                : 'bg-green-500 text-white hover:bg-green-600'
+                        }`}
+                    >
+                        {sseEnabled ? 'Disable SSE' : 'Enable SSE'}
+                    </button>
 
                     {/* Manual Refresh Button */}
                     <button
@@ -430,7 +498,15 @@ export default function UsageDashboard() {
                 </div>
             </details>
 
-            {/* Rest of your dashboard remains the same */}
+            {/* Error Banner */}
+            {error && data && (
+                <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4">
+                    <p className="font-bold">Warning</p>
+                    <p>{error}</p>
+                </div>
+            )}
+
+            {/* Metrics */}
             <div className="flex flex-wrap gap-4">
                 <div className={`${cardStyle} flex-1 border-l-4 border-green-500`}>
                     <p className="text-sm font-medium">Total Uploads</p>
@@ -450,7 +526,7 @@ export default function UsageDashboard() {
                 </div>
             </div>
 
-            {/* Charts and other sections remain the same as your original code */}
+            {/* Charts */}
             <div className="flex flex-wrap gap-6">
                 <div className={`${cardStyle} flex-1 min-w-[300px]`}>
                     <p className="text-lg font-semibold mb-2">Uploads (Success vs Failed)</p>
@@ -482,7 +558,7 @@ export default function UsageDashboard() {
                 </div>
             </div>
 
-            {/* Recent sections remain the same */}
+            {/* Recent Uploads */}
             <div className="flex flex-col gap-4">
                 <p className="text-lg font-semibold mb-2">Recent Uploads</p>
                 {recentUploads && recentUploads.length > 0 ? recentUploads.map(u => (
@@ -498,6 +574,37 @@ export default function UsageDashboard() {
                     </div>
                 )) : (
                     <p className="text-gray-500">No recent uploads</p>
+                )}
+            </div>
+
+            {/* Recent Queries */}
+            <div className="flex flex-col gap-4">
+                <p className="text-lg font-semibold mb-2">Recent Queries</p>
+                {recentQueries && recentQueries.length > 0 ? recentQueries.map(q => (
+                    <div key={q.segmentId + q.timestamp} className={cardStyle}>
+                        <div className="flex justify-between items-center mb-1">
+                            <span className="font-mono text-sm truncate">UserID: {q.userId}</span>
+                            {badge(q.success)}
+                        </div>
+                        <div className="text-xs text-gray-500 dark:text-gray-300 truncate">SegmentID: {q.segmentId}</div>
+                        <div className="text-xs text-gray-400 mt-1">{new Date(q.timestamp || q.createdAt).toLocaleString()}</div>
+                    </div>
+                )) : (
+                    <p className="text-gray-500">No recent queries</p>
+                )}
+            </div>
+
+            {/* Recent IPs */}
+            <div className="flex flex-col gap-4">
+                <p className="text-lg font-semibold mb-2">Recent IPs / User Agents</p>
+                {recentIPs && recentIPs.length > 0 ? recentIPs.map(ip => (
+                    <div key={ip.createdAt} className={cardStyle}>
+                        <div className="font-mono text-sm">{ip.ipAddress}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-300 truncate">{ip.userAgent}</div>
+                        <div className="text-xs text-gray-400 mt-1">{new Date(ip.createdAt).toLocaleString()}</div>
+                    </div>
+                )) : (
+                    <p className="text-gray-500">No recent IP data</p>
                 )}
             </div>
         </div>
