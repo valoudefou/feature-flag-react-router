@@ -72,7 +72,7 @@ export default function UsageDashboard() {
   const cardStyle = 'bg-white dark:bg-gray-800 rounded-lg shadow p-4 hover:shadow-lg transition-shadow';
 
   return (
-    <div className={`p-6 space-y-6 ${theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900'}`}>
+    <div className={`p-6 space-y-6 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
       {/* Header */}
       <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">Usage Dashboard</h1>
@@ -83,25 +83,25 @@ export default function UsageDashboard() {
   {/* Total Uploads */}
   <div className={`${cardStyle} flex-1 border-l-4 border-green-500`}>
     <p className="text-sm font-medium">Total Uploads</p>
-    <p className="text-2xl font-bold">{metrics.totalUploads} ✅</p>
+    <p className="text-2xl font-bold">{metrics.totalUploads}</p>
   </div>
 
   {/* Failed Uploads */}
   <div className={`${cardStyle} flex-1 border-l-4 border-red-500`}>
     <p className="text-sm font-medium">Failed Uploads</p>
-    <p className="text-2xl font-bold">{metrics.failedUploads} ❌</p>
+    <p className="text-2xl font-bold">{metrics.failedUploads}</p>
   </div>
 
     {/* Total Queries */}
     <div className={`${cardStyle} flex-1 border-l-4 border-green-500`}>
         <p className="text-sm font-medium">Total Queries</p>
-        <p className="text-2xl font-bold">{metrics.totalQueries} ✅</p>
+        <p className="text-2xl font-bold">{metrics.totalQueries}</p>
     </div>
 
     {/* Failed Queries */}
     <div className={`${cardStyle} flex-1 border-l-4 border-red-500`}>
         <p className="text-sm font-medium">Failed Queries</p>
-        <p className="text-2xl font-bold">{metrics.failedQueries} ❌</p>
+        <p className="text-2xl font-bold">{metrics.failedQueries}</p>
     </div>
     </div>
 
