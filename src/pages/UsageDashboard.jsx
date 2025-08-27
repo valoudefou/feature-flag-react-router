@@ -503,9 +503,9 @@ const handleUploadFilterChange = (newFilter) => {
                             >
                                 Success Only
                             </button>
-                  <button 
+<button 
     className={`px-4 py-2 rounded-lg transition-colors ${
-        currentFilter === 'failed' 
+        uploadFilter === 'failed' 
             ? 'bg-red-500 text-white' 
             : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
     }`}
@@ -513,6 +513,7 @@ const handleUploadFilterChange = (newFilter) => {
 >
     Failed Only
 </button>
+
                         </div>
                     </div>
 
