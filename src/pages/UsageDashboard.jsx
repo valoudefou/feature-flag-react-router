@@ -17,10 +17,8 @@ export default function UsageDashboard() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [lastUpdated, setLastUpdated] = useState(null);
-    const [isLiveUpdate, setIsLiveUpdate] = useState(false);
     const [connectionStatus, setConnectionStatus] = useState('checking');
     const [debugInfo, setDebugInfo] = useState([]);
-    const [sseEnabled, setSseEnabled] = useState(false);
     const [serverReachable, setServerReachable] = useState(null);
     const [retryCount, setRetryCount] = useState(0);
 
@@ -81,8 +79,6 @@ export default function UsageDashboard() {
     };
 
     useEffect(() => {
-        let evtSource;
-        let retryTimeout;
         let pollInterval;
         let healthCheckInterval;
 
@@ -90,7 +86,6 @@ export default function UsageDashboard() {
             addDebugLog('Starting fetch...');
             setError(null);
 
-            // Skip separate health check, just try to fetch data directly
             const result = await checkServerByFetchingData();
             
             if (!result.reachable) {
@@ -123,142 +118,6 @@ export default function UsageDashboard() {
                 setLoading(false);
             }
         }
-
-        const connectSSE = () => {
-            if (!sseEnabled || !serverReachable) {
-                addDebugLog('SSE disabled or server unreachable, skipping connection');
-                return;
-            }
-
-            // Clear any existing connection
-            if (evtSource) {
-                addDebugLog('Closing existing SSE connection');
-                evtSource.close();
-                evtSource = null;
-            }
-
-            if (retryTimeout) {
-                clearTimeout(retryTimeout);
-                retryTimeout = null;
-            }
-
-            addDebugLog('Attempting SSE connection...');
-            setConnectionStatus('connecting');
-
-            try {
-                evtSource = new EventSource('https://live-server1.com/events');
-                let connectionEstablished = false;
-                let reconnectAttempts = 0;
-                const maxReconnectAttempts = 3;
-
-                evtSource.onopen = () => {
-                    addDebugLog('SSE connection opened');
-                    connectionEstablished = true;
-                    reconnectAttempts = 0;
-                    setConnectionStatus('connected');
-                };
-
-                evtSource.addEventListener('connected', e => {
-                    addDebugLog('Received connection confirmation from server');
-                    connectionEstablished = true;
-                    setConnectionStatus('connected');
-                });
-
-                evtSource.addEventListener('heartbeat', e => {
-                    if (!connectionEstablished) {
-                        connectionEstablished = true;
-                        setConnectionStatus('connected');
-                    }
-                });
-
-                evtSource.addEventListener('upload', e => {
-                    addDebugLog('Received upload event');
-                    setIsLiveUpdate(true);
-                    setTimeout(() => setIsLiveUpdate(false), 3000);
-
-                    try {
-                        const eventData = JSON.parse(e.data);
-                        setData(prev => {
-                            if (!prev) return prev;
-                            const totalUploads = prev.metrics.totalUploads + 1;
-                            const failedUploads = prev.metrics.failedUploads + (eventData.success ? 0 : 1);
-                            return {
-                                ...prev,
-                                metrics: { ...prev.metrics, totalUploads, failedUploads },
-                                recentUploads: [eventData, ...prev.recentUploads].slice(0, 50),
-                            };
-                        });
-                        setLastUpdated(new Date());
-                    } catch (err) {
-                        addDebugLog(`Error processing upload event: ${err.message}`);
-                    }
-                });
-
-                evtSource.addEventListener('query', e => {
-                    addDebugLog('Received query event');
-                    setIsLiveUpdate(true);
-                    setTimeout(() => setIsLiveUpdate(false), 3000);
-
-                    try {
-                        const eventData = JSON.parse(e.data);
-                        setData(prev => {
-                            if (!prev) return prev;
-                            const totalQueries = prev.metrics.totalQueries + 1;
-                            const failedQueries = prev.metrics.failedQueries + (eventData.success ? 0 : 1);
-                            return {
-                                ...prev,
-                                metrics: { ...prev.metrics, totalQueries, failedQueries },
-                                recentQueries: [eventData, ...prev.recentQueries].slice(0, 50),
-                            };
-                        });
-                        setLastUpdated(new Date());
-                    } catch (err) {
-                        addDebugLog(`Error processing query event: ${err.message}`);
-                    }
-                });
-
-                evtSource.addEventListener('database_change', e => {
-                    addDebugLog('Received database_change event - refetching data');
-                    setIsLiveUpdate(true);
-                    setTimeout(() => setIsLiveUpdate(false), 3000);
-                    fetchUsage();
-                });
-
-                evtSource.onerror = (err) => {
-                    addDebugLog(`SSE error - ReadyState: ${evtSource?.readyState}, Attempts: ${reconnectAttempts}`);
-                    setConnectionStatus('disconnected');
-
-                    if (evtSource) {
-                        evtSource.close();
-                        evtSource = null;
-                    }
-
-                    if (reconnectAttempts < maxReconnectAttempts && serverReachable) {
-                        reconnectAttempts++;
-                        const delay = Math.min(5000 * reconnectAttempts, 30000);
-                        addDebugLog(`Will retry SSE connection in ${delay/1000}s (attempt ${reconnectAttempts}/${maxReconnectAttempts})`);
-                        
-                        retryTimeout = setTimeout(() => {
-                            if (sseEnabled && serverReachable) {
-                                addDebugLog('Retrying SSE connection...');
-                                connectSSE();
-                            }
-                        }, delay);
-                    } else {
-                        addDebugLog('Max SSE reconnection attempts reached or server unreachable');
-                        setConnectionStatus('error');
-                        setSseEnabled(false);
-                        startPolling();
-                    }
-                };
-
-            } catch (err) {
-                addDebugLog(`SSE setup error: ${err.message}`);
-                setConnectionStatus('error');
-                setSseEnabled(false);
-                startPolling();
-            }
-        };
 
         const startPolling = () => {
             if (pollInterval) {
@@ -301,10 +160,7 @@ export default function UsageDashboard() {
         // Initial setup
         addDebugLog('Dashboard initializing...');
         fetchUsage().then(() => {
-            if (sseEnabled && serverReachable) {
-                addDebugLog('Initial fetch complete, starting SSE...');
-                connectSSE();
-            } else if (serverReachable) {
+            if (serverReachable) {
                 addDebugLog('Initial fetch complete, starting polling...');
                 startPolling();
             }
@@ -315,12 +171,6 @@ export default function UsageDashboard() {
         return () => {
             addDebugLog('Component unmounting, cleaning up');
             
-            if (evtSource) {
-                evtSource.close();
-            }
-            if (retryTimeout) {
-                clearTimeout(retryTimeout);
-            }
             if (pollInterval) {
                 clearInterval(pollInterval);
             }
@@ -328,7 +178,7 @@ export default function UsageDashboard() {
                 clearInterval(healthCheckInterval);
             }
         };
-    }, [sseEnabled]);
+    }, []);
 
     const handleRefresh = async () => {
         addDebugLog('Manual refresh triggered');
@@ -361,15 +211,6 @@ export default function UsageDashboard() {
             setLoading(false);
         }
     };
-
-    const toggleSSE = () => {
-        const newState = !sseEnabled;
-        setSseEnabled(newState);
-        addDebugLog(`SSE ${newState ? 'enabled' : 'disabled'} by user`);
-    };
-
-    // Rest of your component remains exactly the same...
-    // (keeping all the existing JSX and helper functions)
 
     if (loading && !data) {
         return (
@@ -449,10 +290,6 @@ export default function UsageDashboard() {
 
     const getConnectionStatusColor = () => {
         switch (connectionStatus) {
-            case 'connected': return 'text-green-600';
-            case 'connecting': return 'text-yellow-600';
-            case 'disconnected': return 'text-red-600';
-            case 'error': return 'text-red-600';
             case 'polling': return 'text-blue-600';
             case 'offline': return 'text-gray-600';
             case 'online': return 'text-green-600';
@@ -463,10 +300,6 @@ export default function UsageDashboard() {
 
     const getConnectionStatusText = () => {
         switch (connectionStatus) {
-            case 'connected': return 'Live (SSE)';
-            case 'connecting': return 'Connecting...';
-            case 'disconnected': return 'Reconnecting...';
-            case 'error': return 'Connection Error';
             case 'polling': return 'Polling (60s)';
             case 'offline': return 'Offline Mode';
             case 'online': return 'Online';
@@ -477,7 +310,7 @@ export default function UsageDashboard() {
 
     return (
         <div className={`p-6 space-y-6 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-            {/* Header with Live Update Indicator */}
+            {/* Header */}
             <div className="flex justify-between items-center mb-4">
                 <h1 className="text-2xl font-bold">Usage Dashboard</h1>
                 <div className="flex items-center gap-4">
@@ -492,36 +325,14 @@ export default function UsageDashboard() {
                     {/* Connection Status */}
                     <div className={`flex items-center gap-2 ${getConnectionStatusColor()}`}>
                         <div className={`w-2 h-2 rounded-full ${
-                            connectionStatus === 'connected' || connectionStatus === 'online' ? 'bg-green-500' :
-                            connectionStatus === 'connecting' || connectionStatus === 'checking' ? 'bg-yellow-500 animate-pulse' :
+                            connectionStatus === 'online' ? 'bg-green-500' :
+                            connectionStatus === 'checking' ? 'bg-yellow-500 animate-pulse' :
                             connectionStatus === 'polling' ? 'bg-blue-500 animate-pulse' :
                             connectionStatus === 'offline' ? 'bg-gray-500' :
                             'bg-red-500'
                         }`}></div>
                         <span className="text-sm font-medium">{getConnectionStatusText()}</span>
                     </div>
-
-                    {/* Live Update Indicator */}
-                    {isLiveUpdate && (
-                        <div className="flex items-center gap-2 text-green-600 animate-pulse">
-                            <div className="w-2 h-2 bg-green-500 rounded-full animate-ping"></div>
-                            <span className="text-sm font-medium">Live Update</span>
-                        </div>
-                    )}
-
-                    {/* SSE Toggle Button - only show if server is reachable */}
-                    {serverReachable && (
-                        <button
-                            onClick={toggleSSE}
-                            className={`px-3 py-1 text-sm rounded transition-colors ${
-                                sseEnabled
-                                    ? 'bg-red-500 text-white hover:bg-red-600'
-                                    : 'bg-green-500 text-white hover:bg-green-600'
-                            }`}
-                        >
-                            {sseEnabled ? 'Disable SSE' : 'Enable SSE'}
-                        </button>
-                    )}
 
                     {/* Manual Refresh Button */}
                     <button
@@ -568,7 +379,7 @@ export default function UsageDashboard() {
                 </div>
             )}
 
-            {/* Rest of your dashboard components remain exactly the same */}
+            {/* Metrics Cards */}
             <div className="flex flex-wrap gap-4">
                 <div className={`${cardStyle} flex-1 border-l-4 border-green-500`}>
                     <p className="text-sm font-medium">Total Uploads</p>
@@ -620,7 +431,7 @@ export default function UsageDashboard() {
                 </div>
             </div>
 
-            {/* Recent sections with empty state handling */}
+            {/* Recent Uploads */}
             <div className="flex flex-col gap-4">
                 <p className="text-lg font-semibold mb-2">Recent Uploads</p>
                 {recentUploads && recentUploads.length > 0 ? recentUploads.map(u => (
@@ -641,6 +452,7 @@ export default function UsageDashboard() {
                 )}
             </div>
 
+            {/* Recent Queries */}
             <div className="flex flex-col gap-4">
                 <p className="text-lg font-semibold mb-2">Recent Queries</p>
                 {recentQueries && recentQueries.length > 0 ? recentQueries.map(q => (
@@ -659,6 +471,7 @@ export default function UsageDashboard() {
                 )}
             </div>
 
+            {/* Recent IPs */}
             <div className="flex flex-col gap-4">
                 <p className="text-lg font-semibold mb-2">Recent IPs / User Agents</p>
                 {recentIPs && recentIPs.length > 0 ? recentIPs.map(ip => (
