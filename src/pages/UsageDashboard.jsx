@@ -31,6 +31,7 @@ export default function UsageDashboard() {
 
     // Add ref to track if component is mounted
     const isInitialMount = useRef(true);
+    const abortControllerRef = useRef(null);
 
     // MOVED: displayUploads useMemo hook to the top, right after state and context
 const displayUploads = useMemo(() => {
@@ -81,50 +82,74 @@ const displayUploads = useMemo(() => {
         console.log(`[Dashboard] ${message}`);
     };
 
-    // Fetch data with filters
-    const checkServerByFetchingData = async (filters = {}) => {
-        const queryParams = new URLSearchParams({
-            uploadFilter: filters.uploadFilter || uploadFilter,
-            limit: '50'
-        });
-
-        addDebugLog(`Testing server with filters: ${queryParams.toString()}`);
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-            const response = await fetch(`https://live-server1.com/api/usage?${queryParams}`, {
-                signal: controller.signal,
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json',
-                },
-            });
-
-            clearTimeout(timeoutId);
-
-            if (response.ok) {
-                addDebugLog('Server is reachable via /api/usage');
-                setServerReachable(true);
-                return { reachable: true, data: await response.json() };
-            } else {
-                addDebugLog(`Server responded with error: ${response.status}`);
-                setServerReachable(false);
-                return { reachable: false, data: null };
-            }
-        } catch (err) {
-            addDebugLog(`Server test failed: ${err.message}`);
-            setServerReachable(false);
-            return { reachable: false, data: null };
+const checkServerByFetchingData = async (filters = {}, signal = null) => {
+    try {
+        const queryParams = new URLSearchParams();
+        
+        if (filters.uploadFilter) {
+            queryParams.append('uploadFilter', filters.uploadFilter);
         }
-    };
+        
+        const url = `http://localhost:3001/api/usage${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+        
+        console.log('Making request to:', url);
+        
+        const fetchOptions = {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        };
+        
+        // Add abort signal if provided
+        if (signal) {
+            fetchOptions.signal = signal;
+        }
+        
+        const response = await fetch(url, fetchOptions);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        console.log('=== RAW SERVER RESPONSE ===');
+        console.log('Response data:', data);
+        console.log('Recent uploads count:', data.recentUploads?.length);
+        
+        return {
+            reachable: true,
+            data: data
+        };
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            console.log('Request was aborted');
+            throw error;
+        }
+        console.error('Server check failed:', error);
+        return {
+            reachable: false,
+            data: null
+        };
+    }
+};
+
 
     // Fetch usage data
 const fetchUsage = async (filters = {}) => {
+    // Cancel any existing request
+    if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+    }
+    
+    // Create new abort controller
+    abortControllerRef.current = new AbortController();
+    
     addDebugLog('Starting fetch...');
     setError(null);
 
-    const result = await checkServerByFetchingData(filters);
+    const result = await checkServerByFetchingData(filters, abortControllerRef.current.signal);
 
     if (!result.reachable) {
         addDebugLog('Server unreachable, using offline mode');
@@ -138,26 +163,14 @@ const fetchUsage = async (filters = {}) => {
     try {
         addDebugLog('Server is reachable, using fetched data');
         setConnectionStatus('online');
-        setData(result.data);
         
         console.log('=== SERVER RESPONSE DEBUG ===');
         console.log('Filter requested:', filters.uploadFilter);
         console.log('Server returned uploads:', result.data.recentUploads?.length || 0);
-        console.log('Server upload details:', result.data.recentUploads?.map(u => ({ 
-            id: u.id, 
-            success: u.success, 
-            chunkId: u.chunkId 
-        })));
+        console.log('Raw server data:', result.data.recentUploads);
         
-        // Verify server filtering worked correctly
-        const serverSuccess = result.data.recentUploads?.filter(u => u.success).length || 0;
-        const serverFailed = result.data.recentUploads?.filter(u => !u.success).length || 0;
-        console.log('Server filtering verification:', {
-            filter: filters.uploadFilter,
-            successCount: serverSuccess,
-            failedCount: serverFailed,
-            total: result.data.recentUploads?.length || 0
-        });
+        // IMPORTANT: Set data directly without any client-side filtering
+        setData(result.data);
         
         setLastUpdated(new Date());
         setError(null);
@@ -166,6 +179,10 @@ const fetchUsage = async (filters = {}) => {
         setServerReachable(true);
 
     } catch (err) {
+        if (err.name === 'AbortError') {
+            addDebugLog('Request was cancelled');
+            return;
+        }
         addDebugLog(`Data processing error: ${err.message}`);
         setError('Error processing server data');
         setData(mockData);
@@ -173,8 +190,10 @@ const fetchUsage = async (filters = {}) => {
         setServerReachable(false);
     } finally {
         setLoading(false);
+        abortControllerRef.current = null;
     }
 };
+
 
 // FIXED: Make the filter change handler async and wait for completion
 const handleUploadFilterChange = async (newFilter) => {
@@ -182,10 +201,12 @@ const handleUploadFilterChange = async (newFilter) => {
     console.log('Previous filter:', uploadFilter);
     console.log('New filter requested:', newFilter);
     
+    // CLEAR existing data first to prevent mixing
+    setData(null);
     setUploadFilter(newFilter);
     setLoading(true);
     
-    addDebugLog(`Filter changing from ${uploadFilter} to ${newFilter}`);
+    addDebugLog(`Filter changing from ${uploadFilter} to ${newFilter} - clearing existing data`);
     
     try {
         // Pass the newFilter directly and wait for completion
@@ -281,7 +302,15 @@ useEffect(() => {
     };
 }, [serverReachable]); // Remove uploadFilter from dependencies
 
-
+// Add this useEffect for cleanup
+useEffect(() => {
+    return () => {
+        // Cleanup on unmount
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+    };
+}, []);
 
     const handleRefresh = async () => {
         addDebugLog('Manual refresh triggered');
