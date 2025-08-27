@@ -108,7 +108,7 @@ export default function UsageDashboard() {
             {/* Charts */}
             <div className="flex flex-wrap gap-6">
                 {/* Uploads Chart */}
-                <div className={`${cardStyle} flex-1 min-w-[300px]`}>
+                <div className={`${cardStyle} flex-1 min-w-[300px] bg-gradient-to-b from-green-50 to-red-50`}>
                     <p className="text-lg font-semibold mb-2">Uploads (Success vs Failed)</p>
                     <ResponsiveContainer width="100%" height={250}>
                         <BarChart data={uploadsData}>
@@ -124,7 +124,7 @@ export default function UsageDashboard() {
                 </div>
 
                 {/* Queries Chart */}
-                <div className={`${cardStyle} flex-1 min-w-[300px]`}>
+                <div className={`${cardStyle} flex-1 min-w-[300px] bg-gradient-to-b from-green-50 to-red-50`}>
                     <p className="text-lg font-semibold mb-2">Queries (Success vs Failed)</p>
                     <ResponsiveContainer width="100%" height={250}>
                         <BarChart data={queriesData}>
@@ -139,6 +139,7 @@ export default function UsageDashboard() {
                     </ResponsiveContainer>
                 </div>
             </div>
+
 
             {/* Recent Uploads */}
             <div className="flex flex-col gap-4">
