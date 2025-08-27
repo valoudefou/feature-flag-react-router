@@ -111,6 +111,15 @@ export default function UsageDashboard() {
             addDebugLog('Server is reachable, using fetched data');
             setConnectionStatus('online');
             setData(result.data);
+            console.log('=== FRONTEND DEBUG ===');
+console.log('Filter requested:', filters.uploadFilter || uploadFilter);
+console.log('Server response uploads:', result.data.recentUploads);
+console.log('Upload success distribution:', {
+  total: result.data.recentUploads?.length || 0,
+  successful: result.data.recentUploads?.filter(u => u.success).length || 0,
+  failed: result.data.recentUploads?.filter(u => !u.success).length || 0
+});
+console.log('Current uploadFilter state:', uploadFilter);
             setLastUpdated(new Date());
             setError(null);
             setRetryCount(0);
