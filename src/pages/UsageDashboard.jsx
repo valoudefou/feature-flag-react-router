@@ -93,9 +93,16 @@ export default function UsageDashboard() {
         }
 
         const connectSSE = () => {
-            // Clear any existing connection
+            // Clear any existing connection and timeout
             if (evtSource) {
+                addDebugLog('Closing existing SSE connection');
                 evtSource.close();
+                evtSource = null;
+            }
+
+            if (retryTimeout) {
+                clearTimeout(retryTimeout);
+                retryTimeout = null;
             }
 
             addDebugLog('Attempting SSE connection...');
@@ -103,19 +110,26 @@ export default function UsageDashboard() {
 
             try {
                 evtSource = new EventSource('https://live-server1.com/events');
+                let connectionEstablished = false;
 
                 evtSource.onopen = () => {
-                    addDebugLog('SSE connected successfully');
+                    addDebugLog('SSE connection opened');
+                    connectionEstablished = true;
                     setConnectionStatus('connected');
                 };
 
                 evtSource.addEventListener('connected', e => {
-                    addDebugLog('Received connection confirmation');
+                    addDebugLog('Received connection confirmation from server');
+                    connectionEstablished = true;
+                    setConnectionStatus('connected');
                 });
 
                 evtSource.addEventListener('heartbeat', e => {
-                    // Don't log every heartbeat to avoid spam
-                    // addDebugLog('SSE heartbeat received');
+                    // Heartbeat received - connection is alive
+                    if (!connectionEstablished) {
+                        connectionEstablished = true;
+                        setConnectionStatus('connected');
+                    }
                 });
 
                 evtSource.addEventListener('upload', e => {
@@ -172,33 +186,34 @@ export default function UsageDashboard() {
                 });
 
                 evtSource.onerror = (err) => {
-                    addDebugLog(`SSE error: ${evtSource.readyState} - ${err.type}`);
+                    addDebugLog(`SSE error - ReadyState: ${evtSource?.readyState}`);
                     setConnectionStatus('disconnected');
 
-                    // Close the current connection
-                    if (evtSource) {
-                        evtSource.close();
-                    }
+                    // Only reconnect if we had established a connection before
+                    if (connectionEstablished) {
+                        addDebugLog('Connection was established before error, will reconnect');
 
-                    // Wait longer before reconnecting to avoid rapid reconnection loops
-                    retryTimeout = setTimeout(() => {
-                        addDebugLog('Retrying SSE connection...');
-                        connectSSE();
-                    }, 5000); // Reduced from 10 seconds
+                        if (evtSource) {
+                            evtSource.close();
+                            evtSource = null;
+                        }
+
+                        // Wait before reconnecting
+                        retryTimeout = setTimeout(() => {
+                            addDebugLog('Retrying SSE connection after error...');
+                            connectSSE();
+                        }, 10000); // 10 seconds
+                    } else {
+                        addDebugLog('Connection never established, stopping reconnection attempts');
+                        setConnectionStatus('error');
+                    }
                 };
 
             } catch (err) {
                 addDebugLog(`SSE setup error: ${err.message}`);
                 setConnectionStatus('error');
-
-                // Retry after error
-                retryTimeout = setTimeout(() => {
-                    addDebugLog('Retrying after setup error...');
-                    connectSSE();
-                }, 10000);
             }
         };
-
 
         // Start with fetch only, then SSE
         fetchUsage().then(() => {
@@ -372,8 +387,8 @@ export default function UsageDashboard() {
                     {/* Connection Status */}
                     <div className={`flex items-center gap-2 ${getConnectionStatusColor()}`}>
                         <div className={`w-2 h-2 rounded-full ${connectionStatus === 'connected' ? 'bg-green-500' :
-                                connectionStatus === 'connecting' ? 'bg-yellow-500 animate-pulse' :
-                                    'bg-red-500'
+                            connectionStatus === 'connecting' ? 'bg-yellow-500 animate-pulse' :
+                                'bg-red-500'
                             }`}></div>
                         <span className="text-sm font-medium">{getConnectionStatusText()}</span>
                     </div>
