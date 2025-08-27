@@ -17,6 +17,7 @@ export default function UsageDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [lastUpdated, setLastUpdated] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   const { user } = useAuth();
   const { theme } = useContext(ThemeContext);
@@ -26,6 +27,7 @@ export default function UsageDashboard() {
 
     async function fetchUsage() {
       try {
+        setRefreshing(true);
         const res = await fetch("https://live-server1.com/api/usage");
         const text = await res.text();
         let json;
@@ -42,21 +44,18 @@ export default function UsageDashboard() {
         setError(err.message);
       } finally {
         setLoading(false);
+        setRefreshing(false);
       }
     }
 
-    // Initial fetch
     fetchUsage();
+    intervalId = setInterval(fetchUsage, 30000); // Refresh every 30s
 
-    // Auto-refresh every 30 seconds
-    intervalId = setInterval(fetchUsage, 30000);
-
-    // Cleanup on unmount
     return () => clearInterval(intervalId);
   }, []);
 
-  if (loading) return <p className="p-4">Loading usage data...</p>;
-  if (error) return <p className="p-4 text-red-500">Error: {error}</p>;
+  if (loading) return <p className="p-6 text-center text-gray-500">Loading usage data...</p>;
+  if (error) return <p className="p-6 text-center text-red-500">Error: {error}</p>;
   if (!data) return null;
 
   const { metrics, recentUploads, recentQueries, recentIPs } = data;
@@ -69,149 +68,145 @@ export default function UsageDashboard() {
     { name: 'Queries', Success: metrics.totalQueries - metrics.failedQueries, Failed: metrics.failedQueries }
   ];
 
-  return (
-    <div className={`p-6 space-y-4 ${theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
-      <h1 className="text-2xl font-bold">Usage Dashboard</h1>
-      {user && <p className="text-sm">Logged in as: {user.email}</p>}
-      {lastUpdated && <p className="text-xs text-gray-500">Last updated: {lastUpdated.toLocaleTimeString()}</p>}
+  const cardStyle = "p-5 rounded-lg shadow-md transition hover:shadow-xl";
 
-      {/* Metrics */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="p-4 bg-green-100 rounded shadow">
-          <h2 className="font-semibold">Total Uploads</h2>
-          <p className="text-xl">{metrics.totalUploads}</p>
+  const Badge = ({ children, type }) => {
+    const base = "px-2 py-0.5 rounded-full text-xs font-semibold";
+    const colors = {
+      success: "bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-200",
+      error: "bg-red-100 text-red-800 dark:bg-red-800 dark:text-red-200",
+    };
+    return <span className={`${base} ${colors[type]}`}>{children}</span>;
+  };
+
+  const TableCard = ({ title, columns, rows }) => (
+    <div className={`${cardStyle} bg-white dark:bg-gray-800 overflow-x-auto`}>
+      <h2 className="text-lg font-semibold mb-3">{title}</h2>
+      <table className="min-w-full table-auto border-collapse border border-gray-200 dark:border-gray-700">
+        <thead className="bg-gray-100 dark:bg-gray-700">
+          <tr>
+            {columns.map(col => (
+              <th key={col} className="px-3 py-2 border text-left text-xs text-gray-500 dark:text-gray-300">{col}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => (
+            <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition">
+              {row.map((cell, j) => <td key={j} className="px-2 py-1 border font-mono text-sm truncate max-w-xs">{cell}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+
+  const uploadsRows = recentUploads.map(u => [
+    u.chunkId,
+    u.size,
+    u.success ? <Badge type="success">✔️</Badge> : <Badge type="error">❌</Badge>,
+    u.requestId,
+    u.ipAddress,
+    u.userAgent,
+    new Date(u.createdAt).toLocaleString()
+  ]);
+
+  const queriesRows = recentQueries.map(q => [
+    q.userId,
+    q.segmentId,
+    q.success ? <Badge type="success">✔️</Badge> : <Badge type="error">❌</Badge>,
+    new Date(q.createdAt).toLocaleString()
+  ]);
+
+  const ipsRows = recentIPs.map(ip => [
+    ip.ipAddress,
+    ip.userAgent,
+    new Date(ip.createdAt).toLocaleString()
+  ]);
+
+  return (
+    <div className={`p-6 space-y-6 ${theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}>
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+          Usage Dashboard
+          {refreshing && <span className="text-sm text-blue-400 animate-pulse">⟳ Refreshing...</span>}
+        </h1>
+        {lastUpdated && <span className="text-xs text-gray-400">Last update: {lastUpdated.toLocaleTimeString()}</span>}
+      </div>
+
+      {user && <p className="text-sm text-gray-400">Logged in as: {user.email}</p>}
+
+      {/* Metrics Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+        <div className={`${cardStyle} bg-green-50 dark:bg-green-900`}>
+          <p className="text-sm font-semibold text-gray-600 dark:text-gray-200">Total Uploads</p>
+          <p className="text-2xl font-mono font-bold">{metrics.totalUploads}</p>
         </div>
-        <div className="p-4 bg-red-100 rounded shadow">
-          <h2 className="font-semibold">Failed Uploads</h2>
-          <p className="text-xl">{metrics.failedUploads}</p>
+        <div className={`${cardStyle} bg-red-50 dark:bg-red-900`}>
+          <p className="text-sm font-semibold text-gray-600 dark:text-gray-200">Failed Uploads</p>
+          <p className="text-2xl font-mono font-bold">{metrics.failedUploads}</p>
         </div>
-        <div className="p-4 bg-green-100 rounded shadow">
-          <h2 className="font-semibold">Total Queries</h2>
-          <p className="text-xl">{metrics.totalQueries}</p>
+        <div className={`${cardStyle} bg-green-50 dark:bg-green-900`}>
+          <p className="text-sm font-semibold text-gray-600 dark:text-gray-200">Total Queries</p>
+          <p className="text-2xl font-mono font-bold">{metrics.totalQueries}</p>
         </div>
-        <div className="p-4 bg-red-100 rounded shadow">
-          <h2 className="font-semibold">Failed Queries</h2>
-          <p className="text-xl">{metrics.failedQueries}</p>
+        <div className={`${cardStyle} bg-red-50 dark:bg-red-900`}>
+          <p className="text-sm font-semibold text-gray-600 dark:text-gray-200">Failed Queries</p>
+          <p className="text-2xl font-mono font-bold">{metrics.failedQueries}</p>
         </div>
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        <div>
-          <h2 className="text-xl font-semibold mb-2">Uploads (Success vs Failed)</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={uploadsData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className={`${cardStyle} bg-white dark:bg-gray-800`}>
+          <h2 className="text-lg font-semibold mb-2">Uploads (Success vs Failed)</h2>
+          <ResponsiveContainer width="100%" height={250}>
+            <BarChart data={uploadsData} margin={{ top: 15, right: 15, left: 0, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#444' : '#eee'} />
               <XAxis dataKey="name" />
               <YAxis />
               <Tooltip />
               <Legend />
-              <Bar dataKey="Success" fill="#4ade80" />
-              <Bar dataKey="Failed" fill="#f87171" />
+              <Bar dataKey="Success" fill="#10B981" />
+              <Bar dataKey="Failed" fill="#EF4444" />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
-        <div>
-          <h2 className="text-xl font-semibold mb-2">Queries (Success vs Failed)</h2>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={queriesData} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" />
+        <div className={`${cardStyle} bg-white dark:bg-gray-800`}>
+          <h2 className="text-lg font-semibold mb-2">Queries (Success vs Failed)</h2>
+          <ResponsiveContainer width="100%" height={250}>
+            <BarChart data={queriesData} margin={{ top: 15, right: 15, left: 0, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#444' : '#eee'} />
               <XAxis dataKey="name" />
               <YAxis />
               <Tooltip />
               <Legend />
-              <Bar dataKey="Success" fill="#4ade80" />
-              <Bar dataKey="Failed" fill="#f87171" />
+              <Bar dataKey="Success" fill="#10B981" />
+              <Bar dataKey="Failed" fill="#EF4444" />
             </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
 
-      {/* Recent Uploads Table */}
-      <div>
-        <h2 className="text-xl font-semibold mb-2">Recent Uploads</h2>
-        <div className="overflow-x-auto">
-          <table className="min-w-full table-auto border border-gray-200">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="px-3 py-2 border">Chunk ID</th>
-                <th className="px-3 py-2 border">Size</th>
-                <th className="px-3 py-2 border">Success</th>
-                <th className="px-3 py-2 border">Request ID</th>
-                <th className="px-3 py-2 border">IP</th>
-                <th className="px-3 py-2 border">User Agent</th>
-                <th className="px-3 py-2 border">Created At</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentUploads.map(u => (
-                <tr key={u.id} className="hover:bg-gray-50">
-                  <td className="px-3 py-2 border">{u.chunkId}</td>
-                  <td className="px-3 py-2 border">{u.size}</td>
-                  <td className="px-3 py-2 border">{u.success ? "✅" : "❌"}</td>
-                  <td className="px-3 py-2 border">{u.requestId}</td>
-                  <td className="px-3 py-2 border">{u.ipAddress}</td>
-                  <td className="px-3 py-2 border">{u.userAgent}</td>
-                  <td className="px-3 py-2 border">{new Date(u.createdAt).toLocaleString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {/* Tables */}
+      <TableCard
+        title="Recent Uploads"
+        columns={['Chunk ID', 'Size', 'Success', 'Request ID', 'IP', 'User Agent', 'Created At']}
+        rows={uploadsRows}
+      />
 
-      {/* Recent Queries Table */}
-      <div>
-        <h2 className="text-xl font-semibold mb-2">Recent Queries</h2>
-        <div className="overflow-x-auto">
-          <table className="min-w-full table-auto border border-gray-200">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="px-3 py-2 border">User ID</th>
-                <th className="px-3 py-2 border">Segment ID</th>
-                <th className="px-3 py-2 border">Success</th>
-                <th className="px-3 py-2 border">Created At</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentQueries.map(q => (
-                <tr key={q.id} className="hover:bg-gray-50">
-                  <td className="px-3 py-2 border">{q.userId}</td>
-                  <td className="px-3 py-2 border">{q.segmentId}</td>
-                  <td className="px-3 py-2 border">{q.success ? "✅" : "❌"}</td>
-                  <td className="px-3 py-2 border">{new Date(q.createdAt).toLocaleString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <TableCard
+        title="Recent Queries"
+        columns={['User ID', 'Segment ID', 'Success', 'Created At']}
+        rows={queriesRows}
+      />
 
-      {/* Recent IPs Table */}
-      <div>
-        <h2 className="text-xl font-semibold mb-2">Recent IPs / User Agents</h2>
-        <div className="overflow-x-auto">
-          <table className="min-w-full table-auto border border-gray-200">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="px-3 py-2 border">IP Address</th>
-                <th className="px-3 py-2 border">User Agent</th>
-                <th className="px-3 py-2 border">Created At</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentIPs.map(ip => (
-                <tr key={ip.createdAt} className="hover:bg-gray-50">
-                  <td className="px-3 py-2 border">{ip.ipAddress}</td>
-                  <td className="px-3 py-2 border">{ip.userAgent}</td>
-                  <td className="px-3 py-2 border">{new Date(ip.createdAt).toLocaleString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <TableCard
+        title="Recent IPs / User Agents"
+        columns={['IP Address', 'User Agent', 'Created At']}
+        rows={ipsRows}
+      />
     </div>
   );
 }
