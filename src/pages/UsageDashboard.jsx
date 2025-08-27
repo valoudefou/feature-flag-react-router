@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect, useContext, useMemo } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { ThemeContext } from '../App';
 import {
@@ -25,6 +25,29 @@ export default function UsageDashboard() {
     // New filter states
     const [uploadFilter, setUploadFilter] = useState('all');
     const [activeTab, setActiveTab] = useState('uploads'); // 'uploads', 'queries', 'ips'
+
+    const displayUploads = useMemo(() => {
+    console.log('=== RENDER DEBUG ===');
+    console.log('uploadFilter state:', uploadFilter);
+    console.log('recentUploads length:', recentUploads?.length);
+    console.log('recentUploads data:', recentUploads?.map(u => ({ id: u.id, success: u.success })));
+    
+    if (!recentUploads) return [];
+    
+    // Apply client-side filtering as backup to ensure correct display
+    switch (uploadFilter) {
+        case 'failed':
+            const failed = recentUploads.filter(upload => upload.success === false);
+            console.log('Client-filtered failed uploads:', failed.length);
+            return failed;
+        case 'success':
+            const successful = recentUploads.filter(upload => upload.success === true);
+            console.log('Client-filtered successful uploads:', successful.length);
+            return successful;
+        default:
+            return recentUploads;
+    }
+}, [recentUploads, uploadFilter]);
 
     useEffect(() => {
         console.log('uploadFilter state changed to:', uploadFilter);
@@ -453,7 +476,8 @@ export default function UsageDashboard() {
                             : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
                         }`}
                 >
-                    Uploads ({recentUploads?.length || 0})
+                    Uploads ({displayUploads?.length || 0})
+
                 </button>
                 <button
                     onClick={() => setActiveTab('queries')}
@@ -514,27 +538,29 @@ export default function UsageDashboard() {
                     </div>
 
                     {/* Upload List */}
-                    <div className="grid gap-4">
-                        {recentUploads && recentUploads.length > 0 ? recentUploads.map(u => (
-                            <div key={u.chunkId + u.timestamp} className={cardStyle}>
-                                <div className="flex justify-between items-center mb-1">
-                                    <span className="font-mono text-sm truncate">{u.chunkId}</span>
-                                    {badge(u.success)}
-                                </div>
-                                <div className="text-xs text-gray-500 dark:text-gray-300">Size: {u.sizeMB || u.size} MB | RequestID: {u.requestId}</div>
-                                <div className="text-xs text-gray-500 dark:text-gray-300">IP: {u.ipAddress}</div>
-                                <div className="text-xs text-gray-500 dark:text-gray-300 truncate">UA: {u.userAgent}</div>
-                                <div className="text-xs text-gray-400 mt-1">{new Date(u.timestamp || u.createdAt).toLocaleString()}</div>
-                            </div>
-                        )) : (
-                            <p className="text-gray-500">
-                                {connectionStatus === 'offline' ? 'No data available (offline mode)' :
-                                    uploadFilter === 'failed' ? 'No failed uploads found' :
-                                        uploadFilter === 'success' ? 'No successful uploads found' :
-                                            'No recent uploads'}
-                            </p>
-                        )}
-                    </div>
+           {/* Upload List */}
+<div className="grid gap-4">
+    {displayUploads && displayUploads.length > 0 ? displayUploads.map(u => (
+        <div key={u.chunkId + u.timestamp} className={cardStyle}>
+            <div className="flex justify-between items-center mb-1">
+                <span className="font-mono text-sm truncate">{u.chunkId}</span>
+                {badge(u.success)}
+            </div>
+            <div className="text-xs text-gray-500 dark:text-gray-300">Size: {u.sizeMB || u.size} MB | RequestID: {u.requestId}</div>
+            <div className="text-xs text-gray-500 dark:text-gray-300">IP: {u.ipAddress}</div>
+            <div className="text-xs text-gray-500 dark:text-gray-300 truncate">UA: {u.userAgent}</div>
+            <div className="text-xs text-gray-400 mt-1">{new Date(u.timestamp || u.createdAt).toLocaleString()}</div>
+        </div>
+    )) : (
+        <p className="text-gray-500">
+            {connectionStatus === 'offline' ? 'No data available (offline mode)' :
+                uploadFilter === 'failed' ? 'No failed uploads found' :
+                    uploadFilter === 'success' ? 'No successful uploads found' :
+                        'No recent uploads'}
+        </p>
+    )}
+</div>
+
                 </div>
             )}
 
