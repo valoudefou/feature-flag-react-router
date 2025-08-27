@@ -26,12 +26,42 @@ export default function UsageDashboard() {
     const [uploadFilter, setUploadFilter] = useState('all');
     const [activeTab, setActiveTab] = useState('uploads'); // 'uploads', 'queries', 'ips'
 
+    const { user } = useAuth();
+    const { theme } = useContext(ThemeContext);
+
+    // MOVED: displayUploads useMemo hook to the top, right after state and context
+    const displayUploads = useMemo(() => {
+        console.log('=== RENDER DEBUG ===');
+        console.log('uploadFilter state:', uploadFilter);
+        
+        // Handle case when data is not loaded yet
+        if (!data?.recentUploads) {
+            console.log('No data available yet');
+            return [];
+        }
+        
+        const recentUploads = data.recentUploads;
+        console.log('recentUploads length:', recentUploads?.length);
+        console.log('recentUploads data:', recentUploads?.map(u => ({ id: u.id, success: u.success })));
+        
+        // Apply client-side filtering as backup to ensure correct display
+        switch (uploadFilter) {
+            case 'failed':
+                const failed = recentUploads.filter(upload => upload.success === false);
+                console.log('Client-filtered failed uploads:', failed.length);
+                return failed;
+            case 'success':
+                const successful = recentUploads.filter(upload => upload.success === true);
+                console.log('Client-filtered successful uploads:', successful.length);
+                return successful;
+            default:
+                return recentUploads;
+        }
+    }, [data?.recentUploads, uploadFilter]); // Use data?.recentUploads as dependency
+
     useEffect(() => {
         console.log('uploadFilter state changed to:', uploadFilter);
     }, [uploadFilter]);
-
-    const { user } = useAuth();
-    const { theme } = useContext(ThemeContext);
 
     // Mock data for when server is unreachable
     const mockData = {
@@ -283,32 +313,8 @@ export default function UsageDashboard() {
 
     if (!data) return null;
 
-    // MOVED: Data destructuring happens BEFORE the useMemo hook
+    // Data destructuring happens AFTER all early returns and hooks
     const { metrics, recentUploads, recentQueries, recentIPs } = data;
-
-    // MOVED: displayUploads useMemo hook is now AFTER data destructuring
-    const displayUploads = useMemo(() => {
-        console.log('=== RENDER DEBUG ===');
-        console.log('uploadFilter state:', uploadFilter);
-        console.log('recentUploads length:', recentUploads?.length);
-        console.log('recentUploads data:', recentUploads?.map(u => ({ id: u.id, success: u.success })));
-        
-        if (!recentUploads) return [];
-        
-        // Apply client-side filtering as backup to ensure correct display
-        switch (uploadFilter) {
-            case 'failed':
-                const failed = recentUploads.filter(upload => upload.success === false);
-                console.log('Client-filtered failed uploads:', failed.length);
-                return failed;
-            case 'success':
-                const successful = recentUploads.filter(upload => upload.success === true);
-                console.log('Client-filtered successful uploads:', successful.length);
-                return successful;
-            default:
-                return recentUploads;
-        }
-    }, [recentUploads, uploadFilter]);
 
     const uploadsData = [
         { name: 'Uploads', Success: metrics.totalUploads - metrics.failedUploads, Failed: metrics.failedUploads }
@@ -478,7 +484,6 @@ export default function UsageDashboard() {
                         }`}
                 >
                     Uploads ({displayUploads?.length || 0})
-
                 </button>
                 <button
                     onClick={() => setActiveTab('queries')}
@@ -534,34 +539,31 @@ export default function UsageDashboard() {
                             >
                                 Failed Only
                             </button>
-
                         </div>
                     </div>
 
                     {/* Upload List */}
-           {/* Upload List */}
-<div className="grid gap-4">
-    {displayUploads && displayUploads.length > 0 ? displayUploads.map(u => (
-        <div key={u.chunkId + u.timestamp} className={cardStyle}>
-            <div className="flex justify-between items-center mb-1">
-                <span className="font-mono text-sm truncate">{u.chunkId}</span>
-                {badge(u.success)}
-            </div>
-            <div className="text-xs text-gray-500 dark:text-gray-300">Size: {u.sizeMB || u.size} MB | RequestID: {u.requestId}</div>
-            <div className="text-xs text-gray-500 dark:text-gray-300">IP: {u.ipAddress}</div>
-            <div className="text-xs text-gray-500 dark:text-gray-300 truncate">UA: {u.userAgent}</div>
-            <div className="text-xs text-gray-400 mt-1">{new Date(u.timestamp || u.createdAt).toLocaleString()}</div>
-        </div>
-    )) : (
-        <p className="text-gray-500">
-            {connectionStatus === 'offline' ? 'No data available (offline mode)' :
-                uploadFilter === 'failed' ? 'No failed uploads found' :
-                    uploadFilter === 'success' ? 'No successful uploads found' :
-                        'No recent uploads'}
-        </p>
-    )}
-</div>
-
+                    <div className="grid gap-4">
+                        {displayUploads && displayUploads.length > 0 ? displayUploads.map(u => (
+                            <div key={u.chunkId + u.timestamp} className={cardStyle}>
+                                <div className="flex justify-between items-center mb-1">
+                                    <span className="font-mono text-sm truncate">{u.chunkId}</span>
+                                    {badge(u.success)}
+                                </div>
+                                <div className="text-xs text-gray-500 dark:text-gray-300">Size: {u.sizeMB || u.size} MB | RequestID: {u.requestId}</div>
+                                <div className="text-xs text-gray-500 dark:text-gray-300">IP: {u.ipAddress}</div>
+                                <div className="text-xs text-gray-500 dark:text-gray-300 truncate">UA: {u.userAgent}</div>
+                                <div className="text-xs text-gray-400 mt-1">{new Date(u.timestamp || u.createdAt).toLocaleString()}</div>
+                            </div>
+                        )) : (
+                            <p className="text-gray-500">
+                                {connectionStatus === 'offline' ? 'No data available (offline mode)' :
+                                    uploadFilter === 'failed' ? 'No failed uploads found' :
+                                        uploadFilter === 'success' ? 'No successful uploads found' :
+                                            'No recent uploads'}
+                            </p>
+                        )}
+                    </div>
                 </div>
             )}
 
