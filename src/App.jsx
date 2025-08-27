@@ -11,10 +11,13 @@ import Home from './pages/Home';
 import Login from './pages/Login';
 import AuthForm from './pages/Signup';
 import Dashboard from './pages/Dashboard';
+import UsageDashboard from './pages/UsageDashboard';
 import Profile from './pages/Profile';
 import Settings from './pages/Settings';
 
-export const ThemeContext = React.createContext();
+import { createContext } from 'react';
+export const ThemeContext = createContext('light');
+
 
 function AppWithThemeAndFlags() {
   const [theme, setTheme] = useState(() => {
@@ -207,6 +210,7 @@ function AppWithThemeAndFlags() {
                   </ProtectedRoute>
                 }
               >
+                <Route path="usage" element={<UsageDashboard />} />
                 <Route path="profile" element={<Profile />} />
                 <Route path="settings" element={<Settings />} />
               </Route>
