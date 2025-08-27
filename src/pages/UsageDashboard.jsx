@@ -149,7 +149,7 @@ export default function UsageDashboard() {
                             <span className="font-mono text-sm truncate">{u.chunkId}</span>
                             {badge(u.success)}
                         </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-300">Size: {u.size} | RequestID: {u.requestId}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-300">Size: {u.size}MB | RequestID: {u.requestId}</div>
                         <div className="text-xs text-gray-500 dark:text-gray-300">IP: {u.ipAddress}</div>
                         <div className="text-xs text-gray-500 dark:text-gray-300 truncate">UA: {u.userAgent}</div>
                         <div className="text-xs text-gray-400 mt-1">{new Date(u.createdAt).toLocaleString()}</div>
