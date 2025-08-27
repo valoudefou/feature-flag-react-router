@@ -70,19 +70,16 @@ function AppWithThemeAndFlags() {
     }
   }, [user]);
 
-  // Keyboard shortcut for Ctrl + Shift + L (or Cmd + Shift + L on Mac)
+  // Keyboard shortcut for just pressing "L"
   useEffect(() => {
     const handleKeydown = (e) => {
-      const isMac = navigator.platform.toUpperCase().includes('MAC');
-      const ctrlOrCmd = isMac ? e.metaKey : e.ctrlKey;
-
       // Avoid triggering in input, textarea, or contenteditable
       const tag = e.target.tagName.toLowerCase();
       const isEditable = e.target.isContentEditable;
       if (tag === 'input' || tag === 'textarea' || isEditable) return;
 
-      if (ctrlOrCmd && e.shiftKey && e.key.toLowerCase() === 'l') {
-        e.preventDefault();
+      // Toggle logs on pressing "L" or "l"
+      if (e.key.toLowerCase() === 'l') {
         setShowLogs((prev) => !prev);
       }
     };
