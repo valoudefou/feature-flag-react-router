@@ -17,11 +17,14 @@ export default function UsageDashboard() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [lastUpdated, setLastUpdated] = useState(null);
+    const [isLiveUpdate, setIsLiveUpdate] = useState(false); // New state for live indicator
 
     const { user } = useAuth();
     const { theme } = useContext(ThemeContext);
 
     useEffect(() => {
+        let evtSource;
+
         async function fetchUsage() {
             try {
                 const res = await fetch("https://live-server1.com/api/usage");
@@ -43,53 +46,81 @@ export default function UsageDashboard() {
             }
         }
 
-        fetchUsage();
+        const connectSSE = () => {
+            evtSource = new EventSource('https://live-server1.com/events');
 
-        // --- SSE Live Updates ---
-        const evtSource = new EventSource('https://live-server1.com/events');
+            evtSource.onopen = () => {
+                console.log('SSE connected');
+            };
 
-        evtSource.addEventListener('upload', e => {
-            const eventData = JSON.parse(e.data);
-            setData(prev => {
-                if (!prev) return prev;
+            // Show live indicator and hide after 3 seconds
+            const showLiveIndicator = () => {
+                setIsLiveUpdate(true);
+                setTimeout(() => setIsLiveUpdate(false), 3000);
+            };
 
-                // Update metrics
-                const totalUploads = prev.metrics.totalUploads + 1;
-                const failedUploads = prev.metrics.failedUploads + (eventData.success ? 0 : 1);
+            evtSource.addEventListener('upload', e => {
+                const eventData = JSON.parse(e.data);
+                showLiveIndicator();
+                
+                setData(prev => {
+                    if (!prev) return prev;
 
-                return {
-                    ...prev,
-                    metrics: { ...prev.metrics, totalUploads, failedUploads },
-                    recentUploads: [eventData, ...prev.recentUploads].slice(0, 50),
-                };
+                    const totalUploads = prev.metrics.totalUploads + 1;
+                    const failedUploads = prev.metrics.failedUploads + (eventData.success ? 0 : 1);
+
+                    return {
+                        ...prev,
+                        metrics: { ...prev.metrics, totalUploads, failedUploads },
+                        recentUploads: [eventData, ...prev.recentUploads].slice(0, 50),
+                    };
+                });
+                setLastUpdated(new Date());
             });
-            setLastUpdated(new Date());
-        });
 
-        evtSource.addEventListener('query', e => {
-            const eventData = JSON.parse(e.data);
-            setData(prev => {
-                if (!prev) return prev;
+            evtSource.addEventListener('query', e => {
+                const eventData = JSON.parse(e.data);
+                showLiveIndicator();
+                
+                setData(prev => {
+                    if (!prev) return prev;
 
-                const totalQueries = prev.metrics.totalQueries + 1;
-                const failedQueries = prev.metrics.failedQueries + (eventData.success ? 0 : 1);
+                    const totalQueries = prev.metrics.totalQueries + 1;
+                    const failedQueries = prev.metrics.failedQueries + (eventData.success ? 0 : 1);
 
-                return {
-                    ...prev,
-                    metrics: { ...prev.metrics, totalQueries, failedQueries },
-                    recentQueries: [eventData, ...prev.recentQueries].slice(0, 50),
-                };
+                    return {
+                        ...prev,
+                        metrics: { ...prev.metrics, totalQueries, failedQueries },
+                        recentQueries: [eventData, ...prev.recentQueries].slice(0, 50),
+                    };
+                });
+                setLastUpdated(new Date());
             });
-            setLastUpdated(new Date());
-        });
 
-        evtSource.onerror = err => {
-            console.error('SSE error:', err);
-            evtSource.close();
+            // Handle any database change event
+            evtSource.addEventListener('database_change', e => {
+                showLiveIndicator();
+                // Refetch all data when major changes occur
+                fetchUsage();
+            });
+
+            evtSource.onerror = (err) => {
+                console.error('SSE error:', err);
+                evtSource.close();
+                
+                // Reconnect after 5 seconds
+                setTimeout(() => {
+                    console.log('Attempting to reconnect SSE...');
+                    connectSSE();
+                }, 5000);
+            };
         };
 
+        fetchUsage();
+        connectSSE();
+
         return () => {
-            evtSource.close();
+            if (evtSource) evtSource.close();
         };
     }, []);
 
@@ -117,12 +148,26 @@ export default function UsageDashboard() {
 
     return (
         <div className={`p-6 space-y-6 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-            {/* Header */}
+            {/* Header with Live Update Indicator */}
             <div className="flex justify-between items-center mb-4">
                 <h1 className="text-2xl font-bold">Usage Dashboard</h1>
-                {lastUpdated && <p className="text-sm text-gray-500 dark:text-gray-300">Updated: {lastUpdated.toLocaleTimeString()}</p>}
+                <div className="flex items-center gap-4">
+                    {/* Live Update Indicator */}
+                    {isLiveUpdate && (
+                        <div className="flex items-center gap-2 text-green-600 animate-pulse">
+                            <div className="w-2 h-2 bg-green-500 rounded-full animate-ping"></div>
+                            <span className="text-sm font-medium">Live Update</span>
+                        </div>
+                    )}
+                    {lastUpdated && (
+                        <p className="text-sm text-gray-500 dark:text-gray-300">
+                            Updated: {lastUpdated.toLocaleTimeString()}
+                        </p>
+                    )}
+                </div>
             </div>
 
+            {/* Rest of your existing JSX remains the same */}
             {/* Metrics */}
             <div className="flex flex-wrap gap-4">
                 <div className={`${cardStyle} flex-1 border-l-4 border-green-500`}>
