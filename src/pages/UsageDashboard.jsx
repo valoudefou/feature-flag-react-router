@@ -175,86 +175,113 @@ export default function UsageDashboard() {
         }
     };
 
-    // FIXED: Handle filter changes properly
-    const handleUploadFilterChange = (newFilter) => {
-        console.log('Filter change requested:', newFilter);
-        setUploadFilter(newFilter);
-        setLoading(true);
+// FIXED: Handle filter changes properly
+// FIXED: Make the filter change handler async and wait for completion
+const handleUploadFilterChange = async (newFilter) => {
+    console.log('=== FILTER CHANGE START ===');
+    console.log('Previous filter:', uploadFilter);
+    console.log('New filter requested:', newFilter);
+    
+    setUploadFilter(newFilter);
+    setLoading(true);
+    
+    addDebugLog(`Filter changing from ${uploadFilter} to ${newFilter}`);
+    
+    try {
+        // Pass the newFilter directly and wait for completion
+        await fetchUsage({ uploadFilter: newFilter });
+        addDebugLog(`Filter change to ${newFilter} completed successfully`);
+        console.log('=== FILTER CHANGE SUCCESS ===');
+    } catch (error) {
+        addDebugLog(`Filter change to ${newFilter} failed: ${error.message}`);
+        console.error('=== FILTER CHANGE ERROR ===', error);
+    }
+};
 
-        // Pass the newFilter directly instead of relying on state
-        fetchUsage({ uploadFilter: newFilter });
-    };
 
-    // FIXED: Separate the initial load from filter changes
-    useEffect(() => {
-        let pollInterval;
-        let healthCheckInterval;
 
-        const startPolling = () => {
-            if (pollInterval) {
-                clearInterval(pollInterval);
-            }
+// FIXED: Separate initial load from filter changes to prevent conflicts
+useEffect(() => {
+    let pollInterval;
+    let healthCheckInterval;
 
-            if (!serverReachable) {
-                addDebugLog('Server unreachable, skipping polling');
-                setConnectionStatus('offline');
-                return;
-            }
-
-            addDebugLog('Starting polling mode (60s intervals)');
-            setConnectionStatus('polling');
-
-            pollInterval = setInterval(() => {
-                addDebugLog('Polling for updates...');
-                // Use the current uploadFilter state for polling
-                fetchUsage({ uploadFilter });
-            }, 60000);
-        };
-
-        const startHealthCheck = () => {
-            healthCheckInterval = setInterval(async () => {
-                const wasReachable = serverReachable;
-                const result = await checkServerByFetchingData({ uploadFilter });
-
-                if (!wasReachable && result.reachable) {
-                    addDebugLog('Server came back online, updating data');
-                    setData(result.data);
-                    setLastUpdated(new Date());
-                    setConnectionStatus('online');
-                } else if (wasReachable && !result.reachable) {
-                    addDebugLog('Server went offline');
-                    setConnectionStatus('offline');
-                }
-            }, 120000);
-        };
-
-        // ONLY run initial setup on first mount
-        if (isInitialMount.current) {
-            addDebugLog('Dashboard initializing...');
-            fetchUsage({ uploadFilter: 'all' }).then(() => {
-                if (serverReachable) {
-                    addDebugLog('Initial fetch complete, starting polling...');
-                    startPolling();
-                }
-                startHealthCheck();
-            });
-            isInitialMount.current = false;
-        } else {
-            // For subsequent filter changes, just restart polling with new filter
-            if (serverReachable) {
-                startPolling();
-            }
+    const startPolling = () => {
+        if (pollInterval) {
+            clearInterval(pollInterval);
         }
 
+        if (!serverReachable) {
+            addDebugLog('Server unreachable, skipping polling');
+            setConnectionStatus('offline');
+            return;
+        }
+
+        addDebugLog(`Starting polling mode (60s intervals) with filter: ${uploadFilter}`);
+        setConnectionStatus('polling');
+
+        pollInterval = setInterval(() => {
+            addDebugLog(`Polling for updates with filter: ${uploadFilter}...`);
+            // Use the current uploadFilter state for polling
+            fetchUsage({ uploadFilter });
+        }, 60000);
+    };
+
+    const startHealthCheck = () => {
+        healthCheckInterval = setInterval(async () => {
+            const wasReachable = serverReachable;
+            const result = await checkServerByFetchingData({ uploadFilter });
+
+            if (!wasReachable && result.reachable) {
+                addDebugLog('Server came back online, updating data');
+                setData(result.data);
+                setLastUpdated(new Date());
+                setConnectionStatus('online');
+            } else if (wasReachable && !result.reachable) {
+                addDebugLog('Server went offline');
+                setConnectionStatus('offline');
+            }
+        }, 120000);
+    };
+
+    // ONLY run initial setup on first mount
+    if (isInitialMount.current) {
+        addDebugLog('Dashboard initializing...');
+        fetchUsage({ uploadFilter: 'all' }).then(() => {
+            if (serverReachable) {
+                addDebugLog('Initial fetch complete, starting polling...');
+                startPolling();
+            }
+            startHealthCheck();
+        });
+        isInitialMount.current = false;
+    } else {
+        // For filter changes, restart polling with new filter after a short delay
+        // This prevents conflicts with the manual fetch in handleUploadFilterChange
+        const restartPollingTimeout = setTimeout(() => {
+            if (serverReachable && !loading) {
+                addDebugLog(`Restarting polling with new filter: ${uploadFilter}`);
+                startPolling();
+            }
+        }, 1000); // 1 second delay to let the manual fetch complete
+
         return () => {
-            if (pollInterval) {
-                clearInterval(pollInterval);
-            }
-            if (healthCheckInterval) {
-                clearInterval(healthCheckInterval);
-            }
+            clearTimeout(restartPollingTimeout);
+            if (pollInterval) clearInterval(pollInterval);
+            if (healthCheckInterval) clearInterval(healthCheckInterval);
         };
-    }, [uploadFilter, serverReachable]); // Keep uploadFilter as dependency but handle it properly
+    }
+
+    return () => {
+        if (pollInterval) {
+            clearInterval(pollInterval);
+        }
+        if (healthCheckInterval) {
+            clearInterval(healthCheckInterval);
+        }
+    };
+}, [serverReachable]); // Remove uploadFilter from dependencies
+
+
 
     const handleRefresh = async () => {
         addDebugLog('Manual refresh triggered');
@@ -411,17 +438,22 @@ export default function UsageDashboard() {
                 </div>
             )}
 
-            {/* Debug Panel (collapsible) */}
-            <details className="mb-4">
-                <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-800">
-                    Debug Information ({debugInfo.length} logs) {retryCount > 0 && `- ${retryCount} retries`}
-                </summary>
-                <div className="mt-2 p-3 bg-gray-50 rounded text-xs space-y-1 max-h-32 overflow-y-auto">
-                    {debugInfo.map((log, index) => (
-                        <div key={index} className="font-mono">{log}</div>
-                    ))}
-                </div>
-            </details>
+   {/* Enhanced Debug Panel */}
+<details className="mb-4">
+    <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-800">
+        Debug Information ({debugInfo.length} logs) - Current Filter: {uploadFilter}
+    </summary>
+    <div className="mt-2 p-3 bg-gray-50 rounded text-xs space-y-1 max-h-32 overflow-y-auto">
+        <div className="font-bold text-blue-600">
+            Current State: Filter={uploadFilter}, Loading={loading.toString()}, 
+            DisplayUploads={displayUploads?.length || 0}
+        </div>
+        {debugInfo.map((log, index) => (
+            <div key={index} className="font-mono">{log}</div>
+        ))}
+    </div>
+</details>
+
 
             {/* Error Banner */}
             {error && data && (
@@ -516,39 +548,46 @@ export default function UsageDashboard() {
             {/* Tab Content */}
             {activeTab === 'uploads' && (
                 <div className="space-y-4">
-                    {/* Upload Filter */}
-                    <div className="flex items-center gap-4">
-                        <p className="text-lg font-semibold">Recent Uploads</p>
-                        <div className="flex gap-2">
-                            <button
-                                onClick={() => handleUploadFilterChange('all')}
-                                className={`px-3 py-1 text-sm rounded transition-colors ${uploadFilter === 'all'
-                                        ? 'bg-blue-500 text-white'
-                                        : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
-                                    }`}
-                            >
-                                All
-                            </button>
-                            <button
-                                onClick={() => handleUploadFilterChange('success')}
-                                className={`px-3 py-1 text-sm rounded transition-colors ${uploadFilter === 'success'
-                                        ? 'bg-green-500 text-white'
-                                        : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
-                                    }`}
-                            >
-                                Success Only
-                            </button>
-                            <button
-                                className={`px-4 py-2 rounded-lg transition-colors ${uploadFilter === 'failed'
-                                        ? 'bg-red-500 text-white'
-                                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                                    }`}
-                                onClick={() => handleUploadFilterChange('failed')}
-                            >
-                                Failed Only
-                            </button>
-                        </div>
-                    </div>
+   {/* Upload Filter with loading states */}
+<div className="flex items-center gap-4">
+    <p className="text-lg font-semibold">Recent Uploads</p>
+    <div className="flex gap-2">
+        <button
+            onClick={() => handleUploadFilterChange('all')}
+            disabled={loading}
+            className={`px-3 py-1 text-sm rounded transition-colors ${
+                uploadFilter === 'all'
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
+            } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+        >
+            {loading && uploadFilter === 'all' ? 'Loading...' : 'All'}
+        </button>
+        <button
+            onClick={() => handleUploadFilterChange('success')}
+            disabled={loading}
+            className={`px-3 py-1 text-sm rounded transition-colors ${
+                uploadFilter === 'success'
+                    ? 'bg-green-500 text-white'
+                    : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
+            } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+        >
+            {loading && uploadFilter === 'success' ? 'Loading...' : 'Success Only'}
+        </button>
+        <button
+            onClick={() => handleUploadFilterChange('failed')}
+            disabled={loading}
+            className={`px-4 py-2 rounded-lg transition-colors ${
+                uploadFilter === 'failed'
+                    ? 'bg-red-500 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+            } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+        >
+            {loading && uploadFilter === 'failed' ? 'Loading...' : 'Failed Only'}
+        </button>
+    </div>
+</div>
+
 
                     {/* Upload List */}
                     <div className="grid gap-4">
