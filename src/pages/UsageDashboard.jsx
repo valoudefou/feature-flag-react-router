@@ -22,7 +22,6 @@ export default function UsageDashboard() {
     const { theme } = useContext(ThemeContext);
 
     useEffect(() => {
-        let interval;
         async function fetchUsage() {
             try {
                 const res = await fetch("https://live-server1.com/api/usage");
@@ -45,8 +44,53 @@ export default function UsageDashboard() {
         }
 
         fetchUsage();
-        interval = setInterval(fetchUsage, 30000); // auto-refresh every 30s
-        return () => clearInterval(interval);
+
+        // --- SSE Live Updates ---
+        const evtSource = new EventSource('https://live-server1.com/events');
+
+        evtSource.addEventListener('upload', e => {
+            const eventData = JSON.parse(e.data);
+            setData(prev => {
+                if (!prev) return prev;
+
+                // Update metrics
+                const totalUploads = prev.metrics.totalUploads + 1;
+                const failedUploads = prev.metrics.failedUploads + (eventData.success ? 0 : 1);
+
+                return {
+                    ...prev,
+                    metrics: { ...prev.metrics, totalUploads, failedUploads },
+                    recentUploads: [eventData, ...prev.recentUploads].slice(0, 50),
+                };
+            });
+            setLastUpdated(new Date());
+        });
+
+        evtSource.addEventListener('query', e => {
+            const eventData = JSON.parse(e.data);
+            setData(prev => {
+                if (!prev) return prev;
+
+                const totalQueries = prev.metrics.totalQueries + 1;
+                const failedQueries = prev.metrics.failedQueries + (eventData.success ? 0 : 1);
+
+                return {
+                    ...prev,
+                    metrics: { ...prev.metrics, totalQueries, failedQueries },
+                    recentQueries: [eventData, ...prev.recentQueries].slice(0, 50),
+                };
+            });
+            setLastUpdated(new Date());
+        });
+
+        evtSource.onerror = err => {
+            console.error('SSE error:', err);
+            evtSource.close();
+        };
+
+        return () => {
+            evtSource.close();
+        };
     }, []);
 
     if (loading) return <p className="p-4">Loading usage data...</p>;
@@ -78,27 +122,21 @@ export default function UsageDashboard() {
                 <h1 className="text-2xl font-bold">Usage Dashboard</h1>
                 {lastUpdated && <p className="text-sm text-gray-500 dark:text-gray-300">Updated: {lastUpdated.toLocaleTimeString()}</p>}
             </div>
+
             {/* Metrics */}
             <div className="flex flex-wrap gap-4">
-                {/* Total Uploads */}
                 <div className={`${cardStyle} flex-1 border-l-4 border-green-500`}>
                     <p className="text-sm font-medium">Total Uploads</p>
                     <p className="text-2xl font-bold">{metrics.totalUploads}</p>
                 </div>
-
-                {/* Failed Uploads */}
                 <div className={`${cardStyle} flex-1 border-l-4 border-red-500`}>
                     <p className="text-sm font-medium">Failed Uploads</p>
                     <p className="text-2xl font-bold">{metrics.failedUploads}</p>
                 </div>
-
-                {/* Total Queries */}
                 <div className={`${cardStyle} flex-1 border-l-4 border-green-500`}>
                     <p className="text-sm font-medium">Total Queries</p>
                     <p className="text-2xl font-bold">{metrics.totalQueries}</p>
                 </div>
-
-                {/* Failed Queries */}
                 <div className={`${cardStyle} flex-1 border-l-4 border-red-500`}>
                     <p className="text-sm font-medium">Failed Queries</p>
                     <p className="text-2xl font-bold">{metrics.failedQueries}</p>
@@ -107,7 +145,6 @@ export default function UsageDashboard() {
 
             {/* Charts */}
             <div className="flex flex-wrap gap-6">
-                {/* Uploads Chart */}
                 <div className={`${cardStyle} flex-1 min-w-[300px]`}>
                     <p className="text-lg font-semibold mb-2">Uploads (Success vs Failed)</p>
                     <ResponsiveContainer width="100%" height={250}>
@@ -122,8 +159,6 @@ export default function UsageDashboard() {
                         </BarChart>
                     </ResponsiveContainer>
                 </div>
-
-                {/* Queries Chart */}
                 <div className={`${cardStyle} flex-1 min-w-[300px]`}>
                     <p className="text-lg font-semibold mb-2">Queries (Success vs Failed)</p>
                     <ResponsiveContainer width="100%" height={250}>
@@ -144,15 +179,15 @@ export default function UsageDashboard() {
             <div className="flex flex-col gap-4">
                 <p className="text-lg font-semibold mb-2">Recent Uploads</p>
                 {recentUploads.map(u => (
-                    <div key={u.id} className={cardStyle}>
+                    <div key={u.chunkId + u.timestamp} className={cardStyle}>
                         <div className="flex justify-between items-center mb-1">
                             <span className="font-mono text-sm truncate">{u.chunkId}</span>
                             {badge(u.success)}
                         </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-300">Size: {u.size}MB | RequestID: {u.requestId}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-300">Size: {u.sizeMB || u.size} MB | RequestID: {u.requestId}</div>
                         <div className="text-xs text-gray-500 dark:text-gray-300">IP: {u.ipAddress}</div>
                         <div className="text-xs text-gray-500 dark:text-gray-300 truncate">UA: {u.userAgent}</div>
-                        <div className="text-xs text-gray-400 mt-1">{new Date(u.createdAt).toLocaleString()}</div>
+                        <div className="text-xs text-gray-400 mt-1">{new Date(u.timestamp || u.createdAt).toLocaleString()}</div>
                     </div>
                 ))}
             </div>
@@ -161,13 +196,13 @@ export default function UsageDashboard() {
             <div className="flex flex-col gap-4">
                 <p className="text-lg font-semibold mb-2">Recent Queries</p>
                 {recentQueries.map(q => (
-                    <div key={q.id} className={cardStyle}>
+                    <div key={q.segmentId + q.timestamp} className={cardStyle}>
                         <div className="flex justify-between items-center mb-1">
                             <span className="font-mono text-sm truncate">UserID: {q.userId}</span>
                             {badge(q.success)}
                         </div>
                         <div className="text-xs text-gray-500 dark:text-gray-300 truncate">SegmentID: {q.segmentId}</div>
-                        <div className="text-xs text-gray-400 mt-1">{new Date(q.createdAt).toLocaleString()}</div>
+                        <div className="text-xs text-gray-400 mt-1">{new Date(q.timestamp || q.createdAt).toLocaleString()}</div>
                     </div>
                 ))}
             </div>
