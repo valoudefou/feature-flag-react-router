@@ -16,15 +16,17 @@ export default function UsageDashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [lastUpdated, setLastUpdated] = useState(null);
 
   const { user } = useAuth();
   const { theme } = useContext(ThemeContext);
 
   useEffect(() => {
+    let intervalId;
+
     async function fetchUsage() {
       try {
         const res = await fetch("https://live-server1.com/api/usage");
-
         const text = await res.text();
         let json;
         try {
@@ -32,9 +34,9 @@ export default function UsageDashboard() {
         } catch {
           throw new Error(`Expected JSON but received: ${text.substring(0, 200)}`);
         }
-
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
         setData(json);
+        setLastUpdated(new Date());
       } catch (err) {
         console.error("Usage fetch error:", err);
         setError(err.message);
@@ -42,7 +44,15 @@ export default function UsageDashboard() {
         setLoading(false);
       }
     }
+
+    // Initial fetch
     fetchUsage();
+
+    // Auto-refresh every 30 seconds
+    intervalId = setInterval(fetchUsage, 30000);
+
+    // Cleanup on unmount
+    return () => clearInterval(intervalId);
   }, []);
 
   if (loading) return <p className="p-4">Loading usage data...</p>;
@@ -60,9 +70,10 @@ export default function UsageDashboard() {
   ];
 
   return (
-    <div className={`p-6 space-y-8 ${theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
+    <div className={`p-6 space-y-4 ${theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
       <h1 className="text-2xl font-bold">Usage Dashboard</h1>
       {user && <p className="text-sm">Logged in as: {user.email}</p>}
+      {lastUpdated && <p className="text-xs text-gray-500">Last updated: {lastUpdated.toLocaleTimeString()}</p>}
 
       {/* Metrics */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
