@@ -23,11 +23,20 @@ export default function UsageDashboard() {
   useEffect(() => {
     async function fetchUsage() {
       try {
-        const res = await fetch("/api/usage");
+        const res = await fetch("https://live-server1.com/api/usage");
+
+        const text = await res.text();
+        let json;
+        try {
+          json = JSON.parse(text);
+        } catch {
+          throw new Error(`Expected JSON but received: ${text.substring(0, 200)}`);
+        }
+
         if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-        const json = await res.json();
         setData(json);
       } catch (err) {
+        console.error("Usage fetch error:", err);
         setError(err.message);
       } finally {
         setLoading(false);
@@ -108,8 +117,90 @@ export default function UsageDashboard() {
         </div>
       </div>
 
-      {/* Tables (recent uploads, queries, IPs) */}
-      {/* ... Keep your tables code from before ... */}
+      {/* Recent Uploads Table */}
+      <div>
+        <h2 className="text-xl font-semibold mb-2">Recent Uploads</h2>
+        <div className="overflow-x-auto">
+          <table className="min-w-full table-auto border border-gray-200">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="px-3 py-2 border">Chunk ID</th>
+                <th className="px-3 py-2 border">Size</th>
+                <th className="px-3 py-2 border">Success</th>
+                <th className="px-3 py-2 border">Request ID</th>
+                <th className="px-3 py-2 border">IP</th>
+                <th className="px-3 py-2 border">User Agent</th>
+                <th className="px-3 py-2 border">Created At</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentUploads.map(u => (
+                <tr key={u.id} className="hover:bg-gray-50">
+                  <td className="px-3 py-2 border">{u.chunkId}</td>
+                  <td className="px-3 py-2 border">{u.size}</td>
+                  <td className="px-3 py-2 border">{u.success ? "✅" : "❌"}</td>
+                  <td className="px-3 py-2 border">{u.requestId}</td>
+                  <td className="px-3 py-2 border">{u.ipAddress}</td>
+                  <td className="px-3 py-2 border">{u.userAgent}</td>
+                  <td className="px-3 py-2 border">{new Date(u.createdAt).toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Recent Queries Table */}
+      <div>
+        <h2 className="text-xl font-semibold mb-2">Recent Queries</h2>
+        <div className="overflow-x-auto">
+          <table className="min-w-full table-auto border border-gray-200">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="px-3 py-2 border">User ID</th>
+                <th className="px-3 py-2 border">Segment ID</th>
+                <th className="px-3 py-2 border">Success</th>
+                <th className="px-3 py-2 border">Created At</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentQueries.map(q => (
+                <tr key={q.id} className="hover:bg-gray-50">
+                  <td className="px-3 py-2 border">{q.userId}</td>
+                  <td className="px-3 py-2 border">{q.segmentId}</td>
+                  <td className="px-3 py-2 border">{q.success ? "✅" : "❌"}</td>
+                  <td className="px-3 py-2 border">{new Date(q.createdAt).toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Recent IPs Table */}
+      <div>
+        <h2 className="text-xl font-semibold mb-2">Recent IPs / User Agents</h2>
+        <div className="overflow-x-auto">
+          <table className="min-w-full table-auto border border-gray-200">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="px-3 py-2 border">IP Address</th>
+                <th className="px-3 py-2 border">User Agent</th>
+                <th className="px-3 py-2 border">Created At</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentIPs.map(ip => (
+                <tr key={ip.createdAt} className="hover:bg-gray-50">
+                  <td className="px-3 py-2 border">{ip.ipAddress}</td>
+                  <td className="px-3 py-2 border">{ip.userAgent}</td>
+                  <td className="px-3 py-2 border">{new Date(ip.createdAt).toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   );
 }
