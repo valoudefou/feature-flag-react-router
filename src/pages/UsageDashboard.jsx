@@ -149,14 +149,15 @@ export default function UsageDashboard() {
             setConnectionStatus('online');
             setData(result.data);
             console.log('=== FRONTEND DEBUG ===');
-            console.log('Filter requested:', filters.uploadFilter || uploadFilter);
+            console.log('Filter requested:', filters.uploadFilter);  // FIXED: Use the passed filter parameter
             console.log('Server response uploads:', result.data.recentUploads);
             console.log('Upload success distribution:', {
                 total: result.data.recentUploads?.length || 0,
                 successful: result.data.recentUploads?.filter(u => u.success).length || 0,
                 failed: result.data.recentUploads?.filter(u => !u.success).length || 0
             });
-            console.log('Current uploadFilter state:', uploadFilter);
+            // REMOVED: Confusing log that showed old state value
+            // console.log('Current uploadFilter state:', uploadFilter);
             setLastUpdated(new Date());
             setError(null);
             setRetryCount(0);
@@ -174,7 +175,7 @@ export default function UsageDashboard() {
         }
     };
 
-    // Handle filter changes
+    // FIXED: Handle filter changes properly
     const handleUploadFilterChange = (newFilter) => {
         console.log('Filter change requested:', newFilter);
         setUploadFilter(newFilter);
@@ -263,7 +264,6 @@ export default function UsageDashboard() {
         await fetchUsage({ uploadFilter });
     };
 
-    // Rest of your component remains the same...
     if (loading && !data) {
         return (
             <div className="p-4 flex flex-col items-center">
@@ -325,7 +325,6 @@ export default function UsageDashboard() {
     // Data destructuring happens AFTER all early returns and hooks
     const { metrics, recentUploads, recentQueries, recentIPs } = data;
 
-    // Rest of your JSX remains exactly the same...
     const uploadsData = [
         { name: 'Uploads', Success: metrics.totalUploads - metrics.failedUploads, Failed: metrics.failedUploads }
     ];
@@ -364,7 +363,6 @@ export default function UsageDashboard() {
 
     return (
         <div className={`p-6 space-y-6 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-            {/* All your existing JSX remains the same */}
             {/* Header */}
             <div className="flex justify-between items-center mb-4">
                 <h1 className="text-2xl font-bold">Usage Dashboard</h1>
@@ -405,9 +403,6 @@ export default function UsageDashboard() {
                 </div>
             </div>
 
-            {/* Rest of your JSX... */}
-            {/* I'll include the rest for completeness but it's identical to your current code */}
-            
             {/* Offline Mode Banner */}
             {connectionStatus === 'offline' && (
                 <div className="bg-orange-100 border-l-4 border-orange-500 text-orange-700 p-4 mb-4">
