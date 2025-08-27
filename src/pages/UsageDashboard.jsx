@@ -43,8 +43,9 @@ export default function UsageDashboard() {
         setLoading(false);
       }
     }
+
     fetchUsage();
-    interval = setInterval(fetchUsage, 30000);
+    interval = setInterval(fetchUsage, 30000); // auto-refresh every 30s
     return () => clearInterval(interval);
   }, []);
 
@@ -68,49 +69,38 @@ export default function UsageDashboard() {
     </span>
   );
 
-  const cardStyle = 'bg-white dark:bg-gray-800 rounded-lg shadow p-4 flex flex-col gap-2 hover:shadow-lg transition-shadow';
+  const cardStyle = 'bg-white dark:bg-gray-800 rounded-lg shadow p-4 hover:shadow-lg transition-shadow';
 
   return (
     <div className={`p-6 space-y-6 ${theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-900'}`}>
-      <div className="flex justify-between items-center">
+      {/* Header */}
+      <div className="flex justify-between items-center mb-4">
         <h1 className="text-2xl font-bold">Usage Dashboard</h1>
-        <div className="flex items-center gap-3 text-sm text-gray-600 dark:text-gray-300">
-          {user && <span>Logged in as: {user.email}</span>}
-          {lastUpdated && (
-            <div className="flex items-center gap-1 animate-spin-slow">
-              <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v4m0 8v4m8-8h-4M4 12H0m16.24-7.76l-2.83 2.83M6.59 17.41l-2.83 2.83M17.41 17.41l2.83 2.83M6.59 6.59l2.83 2.83" />
-              </svg>
-              <span>Updated: {lastUpdated.toLocaleTimeString()}</span>
-            </div>
-          )}
-        </div>
+        {lastUpdated && <p className="text-sm text-gray-500 dark:text-gray-300">Updated: {lastUpdated.toLocaleTimeString()}</p>}
       </div>
 
-      {/* Metrics Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className={`${cardStyle}`}>
+      {/* Metrics */}
+      <div className="flex flex-col gap-4">
+        <div className={cardStyle}>
           <p className="text-sm font-medium">Total Uploads</p>
           <p className="text-2xl font-bold">{metrics.totalUploads}</p>
         </div>
-        <div className={`${cardStyle} flex justify-between items-center`}>
+        <div className={cardStyle}>
           <p className="text-sm font-medium">Failed Uploads</p>
-          {badge(metrics.failedUploads === 0)}
-          <p className="text-xl font-bold">{metrics.failedUploads}</p>
+          <p className="text-2xl font-bold">{metrics.failedUploads}</p>
         </div>
-        <div className={`${cardStyle}`}>
+        <div className={cardStyle}>
           <p className="text-sm font-medium">Total Queries</p>
           <p className="text-2xl font-bold">{metrics.totalQueries}</p>
         </div>
-        <div className={`${cardStyle} flex justify-between items-center`}>
+        <div className={cardStyle}>
           <p className="text-sm font-medium">Failed Queries</p>
-          {badge(metrics.failedQueries === 0)}
-          <p className="text-xl font-bold">{metrics.failedQueries}</p>
+          <p className="text-2xl font-bold">{metrics.failedQueries}</p>
         </div>
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="flex flex-col gap-6">
         <div className={cardStyle}>
           <p className="text-lg font-semibold mb-2">Uploads (Success vs Failed)</p>
           <ResponsiveContainer width="100%" height={250}>
@@ -125,6 +115,7 @@ export default function UsageDashboard() {
             </BarChart>
           </ResponsiveContainer>
         </div>
+
         <div className={cardStyle}>
           <p className="text-lg font-semibold mb-2">Queries (Success vs Failed)</p>
           <ResponsiveContainer width="100%" height={250}>
@@ -141,69 +132,48 @@ export default function UsageDashboard() {
         </div>
       </div>
 
-      {/* Horizontal Scrollable Cards */}
-      <div className="space-y-6">
-        {/* Recent Uploads */}
-        <div>
-          <p className="text-lg font-semibold mb-2">Recent Uploads</p>
-          <div className="flex gap-4 overflow-x-auto py-2">
-            {recentUploads.map(u => (
-              <div key={u.id} className="min-w-[250px] bg-white dark:bg-gray-800 shadow rounded-lg p-4 flex flex-col gap-2 hover:shadow-lg transition-shadow">
-                <div className="flex justify-between items-center">
-                  <span className="font-mono text-sm truncate">{u.chunkId}</span>
-                  {badge(u.success)}
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-300">
-                  Size: {u.size} | RequestID: {u.requestId}
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-300">
-                  IP: {u.ipAddress}
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-300 truncate">
-                  UA: {u.userAgent}
-                </div>
-                <div className="text-xs text-gray-400">
-                  {new Date(u.createdAt).toLocaleString()}
-                </div>
-              </div>
-            ))}
+      {/* Recent Uploads */}
+      <div className="flex flex-col gap-4">
+        <p className="text-lg font-semibold mb-2">Recent Uploads</p>
+        {recentUploads.map(u => (
+          <div key={u.id} className={cardStyle}>
+            <div className="flex justify-between items-center mb-1">
+              <span className="font-mono text-sm truncate">{u.chunkId}</span>
+              {badge(u.success)}
+            </div>
+            <div className="text-xs text-gray-500 dark:text-gray-300">Size: {u.size} | RequestID: {u.requestId}</div>
+            <div className="text-xs text-gray-500 dark:text-gray-300">IP: {u.ipAddress}</div>
+            <div className="text-xs text-gray-500 dark:text-gray-300 truncate">UA: {u.userAgent}</div>
+            <div className="text-xs text-gray-400 mt-1">{new Date(u.createdAt).toLocaleString()}</div>
           </div>
-        </div>
+        ))}
+      </div>
 
-        {/* Recent Queries */}
-        <div>
-          <p className="text-lg font-semibold mb-2">Recent Queries</p>
-          <div className="flex gap-4 overflow-x-auto py-2">
-            {recentQueries.map(q => (
-              <div key={q.id} className="min-w-[250px] bg-white dark:bg-gray-800 shadow rounded-lg p-4 flex flex-col gap-2 hover:shadow-lg transition-shadow">
-                <div className="flex justify-between items-center">
-                  <span className="font-mono text-sm truncate">UserID: {q.userId}</span>
-                  {badge(q.success)}
-                </div>
-                <div className="text-xs text-gray-500 dark:text-gray-300 truncate">
-                  SegmentID: {q.segmentId}
-                </div>
-                <div className="text-xs text-gray-400">
-                  {new Date(q.createdAt).toLocaleString()}
-                </div>
-              </div>
-            ))}
+      {/* Recent Queries */}
+      <div className="flex flex-col gap-4">
+        <p className="text-lg font-semibold mb-2">Recent Queries</p>
+        {recentQueries.map(q => (
+          <div key={q.id} className={cardStyle}>
+            <div className="flex justify-between items-center mb-1">
+              <span className="font-mono text-sm truncate">UserID: {q.userId}</span>
+              {badge(q.success)}
+            </div>
+            <div className="text-xs text-gray-500 dark:text-gray-300 truncate">SegmentID: {q.segmentId}</div>
+            <div className="text-xs text-gray-400 mt-1">{new Date(q.createdAt).toLocaleString()}</div>
           </div>
-        </div>
+        ))}
+      </div>
 
-        {/* Recent IPs */}
-        <div>
-          <p className="text-lg font-semibold mb-2">Recent IPs / User Agents</p>
-          <div className="flex gap-4 overflow-x-auto py-2">
-            {recentIPs.map(ip => (
-              <div key={ip.createdAt} className="min-w-[250px] bg-white dark:bg-gray-800 shadow rounded-lg p-4 flex flex-col gap-2 hover:shadow-lg transition-shadow">
-                <div className="font-mono text-sm">{ip.ipAddress}</div>
-                <div className="text-xs text-gray-500 dark:text-gray-300 truncate">{ip.userAgent}</div>
-                <div className="text-xs text-gray-400">{new Date(ip.createdAt).toLocaleString()}</div>
-              </div>
-            ))}
+      {/* Recent IPs */}
+      <div className="flex flex-col gap-4">
+        <p className="text-lg font-semibold mb-2">Recent IPs / User Agents</p>
+        {recentIPs.map(ip => (
+          <div key={ip.createdAt} className={cardStyle}>
+            <div className="font-mono text-sm">{ip.ipAddress}</div>
+            <div className="text-xs text-gray-500 dark:text-gray-300 truncate">{ip.userAgent}</div>
+            <div className="text-xs text-gray-400 mt-1">{new Date(ip.createdAt).toLocaleString()}</div>
           </div>
-        </div>
+        ))}
       </div>
     </div>
   );
