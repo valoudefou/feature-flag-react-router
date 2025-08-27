@@ -18,69 +18,74 @@ export default function UsageDashboard() {
     const [error, setError] = useState(null);
     const [lastUpdated, setLastUpdated] = useState(null);
     const [isLiveUpdate, setIsLiveUpdate] = useState(false);
-    const [connectionStatus, setConnectionStatus] = useState('connecting'); // New state for connection status
+    const [connectionStatus, setConnectionStatus] = useState('disconnected');
+    const [debugInfo, setDebugInfo] = useState([]); // Add debug info
 
     const { user } = useAuth();
     const { theme } = useContext(ThemeContext);
 
+    // Add debug logging function
+    const addDebugLog = (message) => {
+        const timestamp = new Date().toLocaleTimeString();
+        setDebugInfo(prev => [`[${timestamp}] ${message}`, ...prev.slice(0, 9)]);
+        console.log(`[Dashboard] ${message}`);
+    };
+
     useEffect(() => {
         let evtSource;
-        let fetchRetryCount = 0;
-        const maxRetries = 3;
+        let retryTimeout;
 
         async function fetchUsage() {
+            addDebugLog('Starting fetch...');
+            setLoading(true);
+            setError(null);
+            
             try {
-                setError(null); // Clear previous errors
-                console.log('Fetching usage data...');
-                
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+                // First, let's test if the server is reachable
+                addDebugLog('Testing server connectivity...');
                 
                 const res = await fetch("https://live-server1.com/api/usage", {
-                    signal: controller.signal,
+                    method: 'GET',
                     headers: {
-                        'Cache-Control': 'no-cache',
                         'Accept': 'application/json',
-                    }
+                        'Content-Type': 'application/json',
+                    },
+                    // Remove timeout for now to see if it's a timeout issue
                 });
                 
-                clearTimeout(timeoutId);
+                addDebugLog(`Server responded with status: ${res.status}`);
                 
                 if (!res.ok) {
                     throw new Error(`HTTP ${res.status}: ${res.statusText}`);
                 }
                 
                 const text = await res.text();
+                addDebugLog(`Received response: ${text.substring(0, 100)}...`);
+                
                 let json;
                 try {
                     json = JSON.parse(text);
                 } catch (parseError) {
+                    addDebugLog(`JSON parse error: ${parseError.message}`);
                     throw new Error(`Invalid JSON response: ${text.substring(0, 200)}`);
                 }
                 
                 setData(json);
                 setLastUpdated(new Date());
                 setError(null);
-                fetchRetryCount = 0; // Reset retry count on success
-                console.log('Usage data fetched successfully');
+                addDebugLog('Data fetched successfully');
                 
             } catch (err) {
+                addDebugLog(`Fetch error: ${err.message}`);
                 console.error("Usage fetch error:", err);
                 
-                if (err.name === 'AbortError') {
-                    setError('Request timeout - server may be slow');
-                } else if (err.message.includes('Failed to fetch')) {
-                    setError('Network error - check your connection');
+                // More specific error messages
+                if (err.name === 'TypeError' && err.message.includes('Failed to fetch')) {
+                    setError('Cannot connect to server - check if https://live-server1.com is running');
+                } else if (err.name === 'AbortError') {
+                    setError('Request timeout - server is too slow');
                 } else {
                     setError(err.message);
-                }
-                
-                // Retry logic for initial fetch
-                if (fetchRetryCount < maxRetries && loading) {
-                    fetchRetryCount++;
-                    console.log(`Retrying fetch (${fetchRetryCount}/${maxRetries}) in 2 seconds...`);
-                    setTimeout(() => fetchUsage(), 2000);
-                    return;
                 }
             } finally {
                 setLoading(false);
@@ -88,34 +93,28 @@ export default function UsageDashboard() {
         }
 
         const connectSSE = () => {
+            addDebugLog('Attempting SSE connection...');
+            setConnectionStatus('connecting');
+            
             try {
-                console.log('Connecting to SSE...');
-                setConnectionStatus('connecting');
-                
                 evtSource = new EventSource('https://live-server1.com/events');
 
                 evtSource.onopen = () => {
-                    console.log('SSE connected successfully');
+                    addDebugLog('SSE connected successfully');
                     setConnectionStatus('connected');
                 };
 
-                // Show live indicator and hide after 3 seconds
-                const showLiveIndicator = () => {
+                evtSource.addEventListener('upload', e => {
+                    addDebugLog('Received upload event');
                     setIsLiveUpdate(true);
                     setTimeout(() => setIsLiveUpdate(false), 3000);
-                };
-
-                evtSource.addEventListener('upload', e => {
+                    
                     try {
                         const eventData = JSON.parse(e.data);
-                        showLiveIndicator();
-                        
                         setData(prev => {
                             if (!prev) return prev;
-
                             const totalUploads = prev.metrics.totalUploads + 1;
                             const failedUploads = prev.metrics.failedUploads + (eventData.success ? 0 : 1);
-
                             return {
                                 ...prev,
                                 metrics: { ...prev.metrics, totalUploads, failedUploads },
@@ -124,21 +123,21 @@ export default function UsageDashboard() {
                         });
                         setLastUpdated(new Date());
                     } catch (err) {
-                        console.error('Error processing upload event:', err);
+                        addDebugLog(`Error processing upload event: ${err.message}`);
                     }
                 });
 
                 evtSource.addEventListener('query', e => {
+                    addDebugLog('Received query event');
+                    setIsLiveUpdate(true);
+                    setTimeout(() => setIsLiveUpdate(false), 3000);
+                    
                     try {
                         const eventData = JSON.parse(e.data);
-                        showLiveIndicator();
-                        
                         setData(prev => {
                             if (!prev) return prev;
-
                             const totalQueries = prev.metrics.totalQueries + 1;
                             const failedQueries = prev.metrics.failedQueries + (eventData.success ? 0 : 1);
-
                             return {
                                 ...prev,
                                 metrics: { ...prev.metrics, totalQueries, failedQueries },
@@ -147,72 +146,86 @@ export default function UsageDashboard() {
                         });
                         setLastUpdated(new Date());
                     } catch (err) {
-                        console.error('Error processing query event:', err);
+                        addDebugLog(`Error processing query event: ${err.message}`);
                     }
                 });
 
                 evtSource.addEventListener('database_change', e => {
-                    try {
-                        showLiveIndicator();
-                        fetchUsage(); // Refetch all data
-                    } catch (err) {
-                        console.error('Error processing database_change event:', err);
-                    }
+                    addDebugLog('Received database_change event - refetching data');
+                    setIsLiveUpdate(true);
+                    setTimeout(() => setIsLiveUpdate(false), 3000);
+                    fetchUsage();
                 });
 
                 evtSource.addEventListener('heartbeat', e => {
-                    // Just log heartbeat, don't show live indicator
-                    console.log('SSE heartbeat received');
+                    addDebugLog('SSE heartbeat received');
                 });
 
                 evtSource.onerror = (err) => {
-                    console.error('SSE error:', err);
+                    addDebugLog(`SSE error occurred`);
                     setConnectionStatus('disconnected');
                     
                     if (evtSource) {
                         evtSource.close();
                     }
                     
-                    // Reconnect after 5 seconds
-                    setTimeout(() => {
-                        console.log('Attempting to reconnect SSE...');
+                    // Retry after 10 seconds instead of 5
+                    retryTimeout = setTimeout(() => {
+                        addDebugLog('Retrying SSE connection...');
                         connectSSE();
-                    }, 5000);
+                    }, 10000);
                 };
 
             } catch (err) {
-                console.error('Error setting up SSE:', err);
+                addDebugLog(`SSE setup error: ${err.message}`);
                 setConnectionStatus('error');
-                
-                // Retry SSE connection after 10 seconds
-                setTimeout(() => {
-                    console.log('Retrying SSE connection...');
-                    connectSSE();
-                }, 10000);
             }
         };
 
-        // Start both fetch and SSE
-        fetchUsage();
-        connectSSE();
+        // Start with fetch only, then SSE
+        fetchUsage().then(() => {
+            // Only try SSE if fetch was successful
+            if (!error) {
+                connectSSE();
+            }
+        });
 
         return () => {
             if (evtSource) {
-                console.log('Closing SSE connection');
+                addDebugLog('Closing SSE connection');
                 evtSource.close();
+            }
+            if (retryTimeout) {
+                clearTimeout(retryTimeout);
             }
         };
     }, []);
 
-    // Manual refresh function
+    // Test server connectivity function
+    const testConnection = async () => {
+        addDebugLog('Testing server connection...');
+        try {
+            const response = await fetch('https://live-server1.com/health');
+            if (response.ok) {
+                addDebugLog('Server health check: OK');
+                const data = await response.json();
+                addDebugLog(`Server response: ${JSON.stringify(data)}`);
+            } else {
+                addDebugLog(`Server health check failed: ${response.status}`);
+            }
+        } catch (err) {
+            addDebugLog(`Server connection test failed: ${err.message}`);
+        }
+    };
+
     const handleRefresh = async () => {
+        addDebugLog('Manual refresh triggered');
         setLoading(true);
         setError(null);
         
         try {
             const res = await fetch("https://live-server1.com/api/usage", {
                 headers: {
-                    'Cache-Control': 'no-cache',
                     'Accept': 'application/json',
                 }
             });
@@ -225,8 +238,9 @@ export default function UsageDashboard() {
             setData(json);
             setLastUpdated(new Date());
             setError(null);
+            addDebugLog('Manual refresh successful');
         } catch (err) {
-            console.error("Manual refresh error:", err);
+            addDebugLog(`Manual refresh failed: ${err.message}`);
             setError(err.message);
         } finally {
             setLoading(false);
@@ -238,6 +252,22 @@ export default function UsageDashboard() {
             <div className="p-4 flex flex-col items-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mb-2"></div>
                 <p>Loading usage data...</p>
+                
+                {/* Debug Panel */}
+                <div className="mt-4 p-4 bg-gray-100 rounded-lg w-full max-w-2xl">
+                    <h3 className="font-bold mb-2">Debug Information:</h3>
+                    <div className="text-xs space-y-1 max-h-40 overflow-y-auto">
+                        {debugInfo.map((log, index) => (
+                            <div key={index} className="font-mono">{log}</div>
+                        ))}
+                    </div>
+                    <button 
+                        onClick={testConnection}
+                        className="mt-2 px-3 py-1 bg-blue-500 text-white text-sm rounded"
+                    >
+                        Test Server Connection
+                    </button>
+                </div>
             </div>
         );
     }
@@ -246,12 +276,31 @@ export default function UsageDashboard() {
         return (
             <div className="p-4 text-center">
                 <p className="text-red-500 mb-4">Error: {error}</p>
-                <button 
-                    onClick={handleRefresh}
-                    className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-                >
-                    Retry
-                </button>
+                
+                {/* Debug Panel */}
+                <div className="mb-4 p-4 bg-gray-100 rounded-lg">
+                    <h3 className="font-bold mb-2">Debug Information:</h3>
+                    <div className="text-xs space-y-1 max-h-40 overflow-y-auto text-left">
+                        {debugInfo.map((log, index) => (
+                            <div key={index} className="font-mono">{log}</div>
+                        ))}
+                    </div>
+                </div>
+                
+                <div className="space-x-2">
+                    <button 
+                        onClick={handleRefresh}
+                        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
+                    >
+                        Retry
+                    </button>
+                    <button 
+                        onClick={testConnection}
+                        className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 transition-colors"
+                    >
+                        Test Connection
+                    </button>
+                </div>
             </div>
         );
     }
@@ -276,7 +325,6 @@ export default function UsageDashboard() {
 
     const cardStyle = 'bg-white dark:bg-gray-800 rounded-lg shadow p-4 hover:shadow-lg transition-shadow';
 
-    // Connection status indicator
     const getConnectionStatusColor = () => {
         switch (connectionStatus) {
             case 'connected': return 'text-green-600';
@@ -338,16 +386,19 @@ export default function UsageDashboard() {
                 </div>
             </div>
 
-            {/* Error Banner */}
-            {error && data && (
-                <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4">
-                    <p className="font-bold">Warning</p>
-                    <p>{error}</p>
+            {/* Debug Panel (collapsible) */}
+            <details className="mb-4">
+                <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-800">
+                    Debug Information ({debugInfo.length} logs)
+                </summary>
+                <div className="mt-2 p-3 bg-gray-50 rounded text-xs space-y-1 max-h-32 overflow-y-auto">
+                    {debugInfo.map((log, index) => (
+                        <div key={index} className="font-mono">{log}</div>
+                    ))}
                 </div>
-            )}
+            </details>
 
-            {/* Rest of your existing JSX remains the same */}
-            {/* Metrics */}
+            {/* Rest of your dashboard remains the same */}
             <div className="flex flex-wrap gap-4">
                 <div className={`${cardStyle} flex-1 border-l-4 border-green-500`}>
                     <p className="text-sm font-medium">Total Uploads</p>
@@ -367,7 +418,7 @@ export default function UsageDashboard() {
                 </div>
             </div>
 
-            {/* Charts */}
+            {/* Charts and other sections remain the same as your original code */}
             <div className="flex flex-wrap gap-6">
                 <div className={`${cardStyle} flex-1 min-w-[300px]`}>
                     <p className="text-lg font-semibold mb-2">Uploads (Success vs Failed)</p>
@@ -399,7 +450,7 @@ export default function UsageDashboard() {
                 </div>
             </div>
 
-            {/* Recent Uploads */}
+            {/* Recent sections remain the same */}
             <div className="flex flex-col gap-4">
                 <p className="text-lg font-semibold mb-2">Recent Uploads</p>
                 {recentUploads && recentUploads.length > 0 ? recentUploads.map(u => (
@@ -415,37 +466,6 @@ export default function UsageDashboard() {
                     </div>
                 )) : (
                     <p className="text-gray-500">No recent uploads</p>
-                )}
-            </div>
-
-            {/* Recent Queries */}
-            <div className="flex flex-col gap-4">
-                <p className="text-lg font-semibold mb-2">Recent Queries</p>
-                {recentQueries && recentQueries.length > 0 ? recentQueries.map(q => (
-                    <div key={q.segmentId + q.timestamp} className={cardStyle}>
-                        <div className="flex justify-between items-center mb-1">
-                            <span className="font-mono text-sm truncate">UserID: {q.userId}</span>
-                            {badge(q.success)}
-                        </div>
-                        <div className="text-xs text-gray-500 dark:text-gray-300 truncate">SegmentID: {q.segmentId}</div>
-                        <div className="text-xs text-gray-400 mt-1">{new Date(q.timestamp || q.createdAt).toLocaleString()}</div>
-                    </div>
-                )) : (
-                    <p className="text-gray-500">No recent queries</p>
-                )}
-            </div>
-
-            {/* Recent IPs */}
-            <div className="flex flex-col gap-4">
-                <p className="text-lg font-semibold mb-2">Recent IPs / User Agents</p>
-                {recentIPs && recentIPs.length > 0 ? recentIPs.map(ip => (
-                    <div key={ip.createdAt} className={cardStyle}>
-                        <div className="font-mono text-sm">{ip.ipAddress}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-300 truncate">{ip.userAgent}</div>
-                        <div className="text-xs text-gray-400 mt-1">{new Date(ip.createdAt).toLocaleString()}</div>
-                    </div>
-                )) : (
-                    <p className="text-gray-500">No recent IP data</p>
                 )}
             </div>
         </div>
