@@ -26,6 +26,10 @@ export default function UsageDashboard() {
     const [uploadFilter, setUploadFilter] = useState('all');
     const [activeTab, setActiveTab] = useState('uploads'); // 'uploads', 'queries', 'ips'
 
+      useEffect(() => {
+    console.log('uploadFilter state changed to:', uploadFilter);
+  }, [uploadFilter]);
+
     const { user } = useAuth();
     const { theme } = useContext(ThemeContext);
 
@@ -138,11 +142,14 @@ console.log('Current uploadFilter state:', uploadFilter);
     };
 
     // Handle filter changes
-    const handleUploadFilterChange = (newFilter) => {
-        setUploadFilter(newFilter);
-        setLoading(true);
-        fetchUsage({ uploadFilter: newFilter });
-    };
+const handleUploadFilterChange = (newFilter) => {
+    console.log('Filter change requested:', newFilter);
+    setUploadFilter(newFilter);
+    setLoading(true);
+    
+    // Pass the newFilter directly instead of relying on state
+    fetchUsage({ uploadFilter: newFilter });
+};
 
     useEffect(() => {
         let pollInterval;
@@ -496,16 +503,16 @@ console.log('Current uploadFilter state:', uploadFilter);
                             >
                                 Success Only
                             </button>
-                            <button
-                                onClick={() => handleUploadFilterChange('failed')}
-                                className={`px-3 py-1 text-sm rounded transition-colors ${
-                                    uploadFilter === 'failed'
-                                        ? 'bg-red-500 text-white'
-                                        : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
-                                }`}
-                            >
-                                Failed Only
-                            </button>
+                  <button 
+    className={`px-4 py-2 rounded-lg transition-colors ${
+        currentFilter === 'failed' 
+            ? 'bg-red-500 text-white' 
+            : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+    }`}
+    onClick={() => handleUploadFilterChange('failed')}
+>
+    Failed Only
+</button>
                         </div>
                     </div>
 
