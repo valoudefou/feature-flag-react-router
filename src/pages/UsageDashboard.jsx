@@ -377,40 +377,7 @@ const UsageDashboard = () => {
             </header>
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                {/* Enhanced Filters */}
-                <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 p-6 mb-8">
-                    <div className="flex items-center space-x-2 mb-4">
-                        <Icons.Filter />
-                        <h2 className="text-lg font-semibold text-gray-900">Filters</h2>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Upload Status</label>
-                            <select
-                                value={uploadFilter}
-                                onChange={(e) => updateFilter('uploadFilter', e.target.value)}
-                                className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                            >
-                                <option value="all">All Uploads</option>
-                                <option value="success">Successful Only</option>
-                                <option value="failed">Failed Only</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Records Limit</label>
-                            <select
-                                value={limit}
-                                onChange={(e) => updateFilter('limit', e.target.value)}
-                                className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                            >
-                                <option value="25">25 Records</option>
-                                <option value="50">50 Records</option>
-                                <option value="100">100 Records</option>
-                                <option value="200">200 Records</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
+ 
 
                 {/* Enhanced Metrics Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -487,6 +454,41 @@ const UsageDashboard = () => {
                                     <span className="text-sm text-gray-600">{entry.name}</span>
                                 </div>
                             ))}
+                        </div>
+                    </div>
+                </div>
+
+                               {/* Enhanced Filters */}
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 p-6 mb-8">
+                    <div className="flex items-center space-x-2 mb-4">
+                        <Icons.Filter />
+                        <h2 className="text-lg font-semibold text-gray-900">Filters</h2>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Upload Status</label>
+                            <select
+                                value={uploadFilter}
+                                onChange={(e) => updateFilter('uploadFilter', e.target.value)}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                            >
+                                <option value="all">All Uploads</option>
+                                <option value="success">Successful Only</option>
+                                <option value="failed">Failed Only</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Records Limit</label>
+                            <select
+                                value={limit}
+                                onChange={(e) => updateFilter('limit', e.target.value)}
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                            >
+                                <option value="25">25 Records</option>
+                                <option value="50">50 Records</option>
+                                <option value="100">100 Records</option>
+                                <option value="200">200 Records</option>
+                            </select>
                         </div>
                     </div>
                 </div>
