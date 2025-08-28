@@ -441,7 +441,7 @@ const UsageDashboard = () => {
                 {/* Enhanced Charts */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
                     {/* Stacked Bar Chart */}
-                    <div className="lg:col-span-2 bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 p-6">
+                    <div className="lg:col-span-2 bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 py-6">
                         <h3 className="text-lg font-semibold text-gray-900 mb-6">Success vs Failure Rate</h3>
                         <ResponsiveContainer width="100%" height={320}>
                             <BarChart data={chartData?.overview} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
@@ -456,7 +456,7 @@ const UsageDashboard = () => {
                     </div>
 
                     {/* Enhanced Donut Chart */}
-                    <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 p-6">
+                    <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 py-6">
                         <h3 className="text-lg font-semibold text-gray-900 mb-6">Upload Distribution</h3>
                         <ResponsiveContainer width="100%" height={320}>
                             <PieChart>
