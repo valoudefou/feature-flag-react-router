@@ -1,6 +1,6 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
-import React, { useContext } from 'react';
+import { useContext } from 'react';
 import { ThemeContext } from '../App';
 
 export default function Layout() {
