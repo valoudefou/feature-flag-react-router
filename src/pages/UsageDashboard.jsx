@@ -78,8 +78,8 @@ const LoadingSkeleton = () => (
     </div>
 );
 
-// Status Badge Component with CSS-only tooltip
-const StatusBadge = ({ success, type = 'default', errorMessage }) => {
+// Simplified Status Badge Component without tooltip
+const StatusBadge = ({ success, type = 'default' }) => {
     const variants = {
         success: 'bg-emerald-50 text-emerald-700 border-emerald-200',
         error: 'bg-red-50 text-red-700 border-red-200',
@@ -89,25 +89,12 @@ const StatusBadge = ({ success, type = 'default', errorMessage }) => {
     };
 
     return (
-        <div className="relative inline-block group">
-            <span
-                className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border transition-all duration-200 ${
-                    !success && errorMessage ? 'cursor-help hover:shadow-md' : ''
-                } ${variants[type] || variants.default}`}
-            >
-                <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${success ? 'bg-emerald-400' : 'bg-red-400'}`}></span>
-                {success ? 'Success' : 'Failed'}
-            </span>
-            
-            {/* Enhanced Tooltip */}
-            {!success && errorMessage && (
-                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 max-w-xs break-words whitespace-normal border border-gray-700">
-                    {errorMessage}
-                    {/* Arrow */}
-                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45 border-r border-b border-gray-700"></div>
-                </div>
-            )}
-        </div>
+        <span
+            className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border transition-all duration-200 ${variants[type] || variants.default}`}
+        >
+            <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${success ? 'bg-emerald-400' : 'bg-red-400'}`}></span>
+            {success ? 'Success' : 'Failed'}
+        </span>
     );
 };
 
@@ -506,44 +493,55 @@ const UsageDashboard = () => {
 
                 {/* Enhanced Data Tables */}
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8">
-                    {/* Recent Uploads */}
-                    <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden">
-                        <div className="px-6 py-4 border-b border-gray-200/50 bg-gray-50/50">
-                            <h3 className="text-lg font-semibold text-gray-900">
-                                Recent Uploads ({recentUploads.length})
-                            </h3>
-                        </div>
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full">
-                                <thead className="bg-gray-50/50">
-                                    <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Chunks</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-200/50">
-                                    {recentUploads.slice(0, 10).map((upload) => (
-                                        <tr key={upload.id} className="hover:bg-gray-50/50 transition-colors">
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                               <StatusBadge success={upload.success} errorMessage={upload.error} />
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                                {formatFileSize(upload.size)}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                                                {upload.totalChunks}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                {formatDate(upload.createdAt)}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+       {/* Recent Uploads */}
+<div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden">
+    <div className="px-6 py-4 border-b border-gray-200/50 bg-gray-50/50">
+        <h3 className="text-lg font-semibold text-gray-900">
+            Recent Uploads ({recentUploads.length})
+        </h3>
+    </div>
+    <div className="overflow-x-auto">
+        <table className="min-w-full">
+            <thead className="bg-gray-50/50">
+                <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Chunks</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Error Message</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+                </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200/50">
+                {recentUploads.slice(0, 10).map((upload) => (
+                    <tr key={upload.id} className="hover:bg-gray-50/50 transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                            <StatusBadge success={upload.success} />
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {formatFileSize(upload.size)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                            {upload.totalChunks}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
+                            {!upload.success && upload.error ? (
+                                <div className="bg-red-50 text-red-700 px-2 py-1 rounded text-xs border border-red-200 break-words">
+                                    {upload.error}
+                                </div>
+                            ) : (
+                                <span className="text-gray-400">-</span>
+                            )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {formatDate(upload.createdAt)}
+                        </td>
+                    </tr>
+                ))}
+            </tbody>
+        </table>
+    </div>
+</div>
+
 
                     {/* Recent Queries */}
                     <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden">
