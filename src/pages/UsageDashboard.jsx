@@ -80,7 +80,6 @@ const LoadingSkeleton = () => (
 
 // Status Badge Component
 const StatusBadge = ({ success, type = 'default', errorMessage }) => {
-    const [hovered, setHovered] = useState(false);
     const variants = {
         success: 'bg-emerald-50 text-emerald-700 border-emerald-200',
         error: 'bg-red-50 text-red-700 border-red-200',
@@ -90,31 +89,13 @@ const StatusBadge = ({ success, type = 'default', errorMessage }) => {
     };
 
     return (
-<span 
-    className="relative inline-block"
-    onMouseEnter={() => setHovered(true)}
-    onMouseLeave={() => setHovered(false)}
->
-    <span
-        className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${variants[type] || variants.default}`}
-    >
-        <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${success ? 'bg-emerald-400' : 'bg-red-400'}`}></span>
-        {success ? 'Success' : 'Failed'}
-    </span>
-
-    {/* Tooltip */}
-    {!success && errorMessage && hovered && (
-        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 z-10 flex flex-col items-center">
-            {/* Tooltip Box */}
-            <div className="px-3 py-1.5 text-xs text-white bg-gray-900 rounded-md shadow-md whitespace-nowrap">
-                {errorMessage}
-            </div>
-            {/* Floating Arrow */}
-            <div className="w-2 h-2 bg-gray-900 transform rotate-45 -mt-1.5"></div>
-        </div>
-    )}
-</span>
-
+        <span
+            className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${variants[type] || variants.default}`}
+            title={!success && errorMessage ? errorMessage : undefined} // <-- show tooltip only on failure
+        >
+            <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${success ? 'bg-emerald-400' : 'bg-red-400'}`}></span>
+            {success ? 'Success' : 'Failed'}
+        </span>
     );
 };
 
