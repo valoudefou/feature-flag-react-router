@@ -79,7 +79,7 @@ const LoadingSkeleton = () => (
 );
 
 // Status Badge Component
-const StatusBadge = ({ success, type = 'default' }) => {
+const StatusBadge = ({ success, type = 'default', errorMessage }) => {
     const variants = {
         success: 'bg-emerald-50 text-emerald-700 border-emerald-200',
         error: 'bg-red-50 text-red-700 border-red-200',
@@ -89,12 +89,16 @@ const StatusBadge = ({ success, type = 'default' }) => {
     };
 
     return (
-        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${variants[type] || variants.default}`}>
+        <span
+            className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${variants[type] || variants.default}`}
+            title={!success && errorMessage ? errorMessage : undefined} // <-- show tooltip only on failure
+        >
             <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${success ? 'bg-emerald-400' : 'bg-red-400'}`}></span>
             {success ? 'Success' : 'Failed'}
         </span>
     );
 };
+
 
 // Metric Card Component
 const MetricCard = ({ title, value, icon: Icon, trend, color = 'blue' }) => {
@@ -330,7 +334,7 @@ const UsageDashboard = () => {
     const { metrics, recentUploads, recentQueries, recentIPs } = dashboardData;
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-0">
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
             {/* Modern Header */}
             <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 sticky top-0 z-10">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -510,7 +514,7 @@ const UsageDashboard = () => {
                                     {recentUploads.slice(0, 10).map((upload) => (
                                         <tr key={upload.id} className="hover:bg-gray-50/50 transition-colors">
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                <StatusBadge success={upload.success} />
+                                               <StatusBadge success={upload.success} errorMessage={upload.error} />
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                                 {formatFileSize(upload.size)}
@@ -549,7 +553,7 @@ const UsageDashboard = () => {
                                     {recentQueries.slice(0, 10).map((query) => (
                                         <tr key={query.id} className="hover:bg-gray-50/50 transition-colors">
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                <StatusBadge success={query.success} />
+                                                <StatusBadge success={query.success} errorMessage={query.error} />
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                                 {query.userId}
