@@ -12,8 +12,141 @@ import {
     Pie,
     Cell,
     LineChart,
-    Line
+    Line,
+    Area,
+    AreaChart
 } from 'recharts';
+
+// Modern Icons Component
+const Icons = {
+    Upload: () => (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+        </svg>
+    ),
+    Search: () => (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+    ),
+    Error: () => (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+    ),
+    Refresh: () => (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+        </svg>
+    ),
+    Filter: () => (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.414A1 1 0 013 6.707V4z" />
+        </svg>
+    ),
+    TrendingUp: () => (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+        </svg>
+    ),
+    Globe: () => (
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9a9 9 0 00-9 9m9-9v9m0-9a9 9 0 019 9m-9 9a9 9 0 01-9-9" />
+        </svg>
+    )
+};
+
+// Loading Skeleton Component
+const LoadingSkeleton = () => (
+    <div className="animate-pulse">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            {[...Array(4)].map((_, i) => (
+                <div key={i} className="bg-white rounded-xl p-6 shadow-sm">
+                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-3"></div>
+                    <div className="h-8 bg-gray-200 rounded w-1/2"></div>
+                </div>
+            ))}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {[...Array(2)].map((_, i) => (
+                <div key={i} className="bg-white rounded-xl p-6 shadow-sm">
+                    <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
+                    <div className="h-64 bg-gray-100 rounded"></div>
+                </div>
+            ))}
+        </div>
+    </div>
+);
+
+// Status Badge Component
+const StatusBadge = ({ success, type = 'default' }) => {
+    const variants = {
+        success: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        error: 'bg-red-50 text-red-700 border-red-200',
+        default: success
+            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+            : 'bg-red-50 text-red-700 border-red-200'
+    };
+
+    return (
+        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${variants[type] || variants.default}`}>
+            <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${success ? 'bg-emerald-400' : 'bg-red-400'}`}></span>
+            {success ? 'Success' : 'Failed'}
+        </span>
+    );
+};
+
+// Metric Card Component
+const MetricCard = ({ title, value, icon: Icon, trend, color = 'blue' }) => {
+    const colorVariants = {
+        blue: 'bg-blue-50 text-blue-600',
+        green: 'bg-emerald-50 text-emerald-600',
+        red: 'bg-red-50 text-red-600',
+        yellow: 'bg-amber-50 text-amber-600',
+        purple: 'bg-purple-50 text-purple-600'
+    };
+
+    return (
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-200">
+            <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-4">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${colorVariants[color]}`}>
+                        <Icon />
+                    </div>
+                    <div>
+                        <p className="text-sm font-medium text-gray-600 mb-1">{title}</p>
+                        <p className="text-2xl font-bold text-gray-900">
+                            {typeof value === 'number' ? value.toLocaleString() : value}
+                        </p>
+                    </div>
+                </div>
+                {trend && (
+                    <div className="flex items-center space-x-1 text-emerald-600">
+                        <Icons.TrendingUp />
+                        <span className="text-sm font-medium">{trend}</span>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
+// Custom Tooltip Component
+const CustomTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+        return (
+            <div className="bg-white p-3 rounded-lg shadow-lg border border-gray-200">
+                <p className="font-medium text-gray-900">{label}</p>
+                {payload.map((entry, index) => (
+                    <p key={index} className="text-sm" style={{ color: entry.color }}>
+                        {entry.name}: {entry.value.toLocaleString()}
+                    </p>
+                ))}
+            </div>
+        );
+    }
+    return null;
+};
 
 const UsageDashboard = () => {
     const [searchParams, setSearchParams] = useSearchParams();
@@ -22,56 +155,49 @@ const UsageDashboard = () => {
     const [error, setError] = useState(null);
     const [refreshing, setRefreshing] = useState(false);
     const [isOnline, setIsOnline] = useState(true);
-
+    const [lastUpdated, setLastUpdated] = useState(new Date());
 
     // Get filter values from URL params
     const uploadFilter = searchParams.get('uploadFilter') || 'all';
     const limit = parseInt(searchParams.get('limit')) || 50;
 
-    // API Base URL - Updated to use your live server
+    // API Base URL
     const API_BASE_URL = 'https://live-server1.com';
 
     // Fetch dashboard data
-const fetchDashboardData = useCallback(async (isRefresh = false) => {
-    try {
-        if (isRefresh) {
-            setRefreshing(true);
-        } else {
-            setLoading(true);
+    const fetchDashboardData = useCallback(async (isRefresh = false) => {
+        try {
+            if (isRefresh) {
+                setRefreshing(true);
+            } else {
+                setLoading(true);
+            }
+
+            const response = await fetch(`${API_BASE_URL}/api/usage?uploadFilter=${uploadFilter}&limit=${limit}`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            setDashboardData(data);
+            setError(null);
+            setIsOnline(true);
+            setLastUpdated(new Date());
+        } catch (err) {
+            console.error('Error fetching dashboard data:', err);
+            setError(`Failed to fetch data: ${err.message}`);
+            setIsOnline(false);
+        } finally {
+            setLoading(false);
+            setRefreshing(false);
         }
-
-        console.log(`Fetching data from: ${API_BASE_URL}/api/usage?uploadFilter=${uploadFilter}&limit=${limit}`);
-
-        const response = await fetch(`${API_BASE_URL}/api/usage?uploadFilter=${uploadFilter}&limit=${limit}`, {
-            method: 'GET',
-            headers: {
-                'Content-Type': 'application/json',
-                // Add any additional headers if needed for CORS or authentication
-            },
-            // Add credentials if your API requires authentication
-            // credentials: 'include',
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        console.log('API Response:', data);
-
-        setDashboardData(data);
-        setError(null);
-        setIsOnline(true); // Set online when API call succeeds
-    } catch (err) {
-        console.error('Error fetching dashboard data:', err);
-        setError(`Failed to fetch data: ${err.message}`);
-        setIsOnline(false); // Set offline when API call fails
-    } finally {
-        setLoading(false);
-        setRefreshing(false);
-    }
-}, [uploadFilter, limit, API_BASE_URL]);
-
+    }, [uploadFilter, limit, API_BASE_URL]);
 
     // Update URL params
     const updateFilter = useCallback((key, value) => {
@@ -112,10 +238,8 @@ const fetchDashboardData = useCallback(async (isRefresh = false) => {
                 { name: 'Failed', value: metrics.failedQueries, color: '#F59E0B' }
             ],
             overview: [
-                { name: 'Total Uploads', value: metrics.totalUploads },
-                { name: 'Failed Uploads', value: metrics.failedUploads },
-                { name: 'Total Queries', value: metrics.totalQueries },
-                { name: 'Failed Queries', value: metrics.failedQueries }
+                { name: 'Uploads', successful: successfulUploads, failed: metrics.failedUploads },
+                { name: 'Queries', successful: successfulQueries, failed: metrics.failedQueries }
             ]
         };
     }, [dashboardData]);
@@ -139,56 +263,59 @@ const fetchDashboardData = useCallback(async (isRefresh = false) => {
     }, []);
 
     const getBrowserInfo = useCallback((userAgent) => {
-        if (!userAgent) return { browser: 'Unknown', device: 'desktop' };
+        if (!userAgent) return { browser: 'Unknown', device: 'desktop', icon: '💻' };
 
         let browser = 'Unknown';
         let device = 'desktop';
+        let icon = '💻';
 
         if (userAgent.includes('Chrome') && !userAgent.includes('Edge')) browser = 'Chrome';
         else if (userAgent.includes('Firefox')) browser = 'Firefox';
         else if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) browser = 'Safari';
         else if (userAgent.includes('Edge')) browser = 'Edge';
-        else if (userAgent.includes('CriOS')) browser = 'Chrome iOS';
 
-        if (userAgent.includes('Mobile') || userAgent.includes('iPhone')) device = 'mobile';
-        else if (userAgent.includes('iPad')) device = 'tablet';
-
-        return { browser, device };
-    }, []);
-
-    const getDeviceIcon = useCallback((device) => {
-        switch (device) {
-            case 'mobile': return '📱';
-            case 'tablet': return '📱';
-            default: return '💻';
+        if (userAgent.includes('Mobile') || userAgent.includes('iPhone')) {
+            device = 'mobile';
+            icon = '📱';
+        } else if (userAgent.includes('iPad')) {
+            device = 'tablet';
+            icon = '📱';
         }
+
+        return { browser, device, icon };
     }, []);
 
+    // Loading state
     if (loading && !dashboardData) {
         return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                    <p className="text-gray-600">Loading dashboard...</p>
-                    <p className="text-sm text-gray-500 mt-2">Connecting to {API_BASE_URL}</p>
+            <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                    <div className="mb-8">
+                        <div className="h-8 bg-gray-200 rounded w-64 mb-2"></div>
+                        <div className="h-4 bg-gray-200 rounded w-96"></div>
+                    </div>
+                    <LoadingSkeleton />
                 </div>
             </div>
         );
     }
 
+    // Error state
     if (error && !dashboardData) {
         return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                <div className="text-center bg-white p-8 rounded-lg shadow-lg max-w-md">
-                    <div className="text-red-500 text-6xl mb-4">⚠️</div>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Error Loading Dashboard</h2>
+            <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
+                <div className="text-center bg-white p-8 rounded-2xl shadow-xl max-w-md border border-gray-100">
+                    <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Icons.Error />
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Connection Error</h2>
                     <p className="text-gray-600 mb-4">{error}</p>
-                    <p className="text-sm text-gray-500 mb-4">API URL: {API_BASE_URL}/api/usage</p>
+                    <p className="text-sm text-gray-500 mb-6">API: {API_BASE_URL}/api/usage</p>
                     <button
                         onClick={() => fetchDashboardData()}
-                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors"
+                        className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition-colors font-medium"
                     >
-                        Retry
+                        Try Again
                     </button>
                 </div>
             </div>
@@ -197,7 +324,7 @@ const fetchDashboardData = useCallback(async (isRefresh = false) => {
 
     if (!dashboardData) {
         return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+            <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
                 <div className="text-gray-500">No data available</div>
             </div>
         );
@@ -206,68 +333,74 @@ const fetchDashboardData = useCallback(async (isRefresh = false) => {
     const { metrics, recentUploads, recentQueries, recentIPs } = dashboardData;
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+            {/* Modern Header */}
+            <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 sticky top-0 z-10">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div className="flex justify-between items-center py-6">
+                        <div>
+                            <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+                                Usage Dashboard
+                            </h1>
+                            <p className="text-gray-600 mt-1">Real-time analytics and monitoring</p>
+                        </div>
 
-       {/* Header */}
-<header className="bg-white shadow-sm border-b border-gray-200">
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center py-6">
-            <div>
-                <h1 className="text-3xl font-bold text-gray-900">Usage Dashboard</h1>
-            </div>
-            <div className="flex items-center space-x-4">
-                {/* Connection Status */}
-                <div className="flex items-center space-x-2">
-                    <div className={`w-3 h-3 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                    <span className={`text-sm font-medium ${isOnline ? 'text-green-700' : 'text-red-700'}`}>
-                        {isOnline ? 'Online' : 'Offline'}
-                    </span>
+                        <div className="flex items-center space-x-4">
+                            {/* Connection Status */}
+                            <div className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-gray-50">
+                                <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-400' : 'bg-red-400'}`}></div>
+                                <span className={`text-sm font-medium ${isOnline ? 'text-emerald-700' : 'text-red-700'}`}>
+                                    {isOnline ? 'Connected' : 'Disconnected'}
+                                </span>
+                            </div>
+
+                            {/* Last Updated */}
+                            <div className="text-sm text-gray-500 hidden sm:block">
+                                Updated: {lastUpdated.toLocaleTimeString()}
+                            </div>
+
+                            {/* Refresh Button */}
+                            <button
+                                onClick={() => fetchDashboardData(true)}
+                                disabled={refreshing}
+                                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-all duration-200 shadow-sm hover:shadow-md"
+                            >
+                                <span className={refreshing ? 'animate-spin' : ''}>
+                                    <Icons.Refresh />
+                                </span>
+                                <span className="hidden sm:inline">{refreshing ? 'Refreshing...' : 'Refresh'}</span>
+                            </button>
+                        </div>
+                    </div>
                 </div>
-                
-                {/* Last Updated */}
-                <div className="text-sm text-gray-500">
-                    Last updated: {new Date().toLocaleTimeString()}
-                </div>
-                
-                {/* Refresh Button */}
-                <button
-                    onClick={() => fetchDashboardData(true)}
-                    disabled={refreshing}
-                    className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
-                >
-                    <span className={refreshing ? 'animate-spin' : ''}>🔄</span>
-                    <span>{refreshing ? 'Refreshing...' : 'Refresh'}</span>
-                </button>
-            </div>
-        </div>
-    </div>
-</header>
+            </header>
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          
-
-                {/* Filters */}
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Filters</h2>
-                    <div className="flex flex-wrap gap-6">
-                        <div className="flex flex-col">
-                            <label className="text-sm font-medium text-gray-700 mb-2">Upload Filter</label>
+                {/* Enhanced Filters */}
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 p-6 mb-8">
+                    <div className="flex items-center space-x-2 mb-4">
+                        <Icons.Filter />
+                        <h2 className="text-lg font-semibold text-gray-900">Filters</h2>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Upload Status</label>
                             <select
                                 value={uploadFilter}
                                 onChange={(e) => updateFilter('uploadFilter', e.target.value)}
-                                className="border border-gray-300 rounded-lg px-3 py-2 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                             >
                                 <option value="all">All Uploads</option>
                                 <option value="success">Successful Only</option>
                                 <option value="failed">Failed Only</option>
                             </select>
                         </div>
-                        <div className="flex flex-col">
-                            <label className="text-sm font-medium text-gray-700 mb-2">Limit</label>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Records Limit</label>
                             <select
                                 value={limit}
                                 onChange={(e) => updateFilter('limit', e.target.value)}
-                                className="border border-gray-300 rounded-lg px-3 py-2 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
                             >
                                 <option value="25">25 Records</option>
                                 <option value="50">50 Records</option>
@@ -278,161 +411,114 @@ const fetchDashboardData = useCallback(async (isRefresh = false) => {
                     </div>
                 </div>
 
-                {/* Metrics Cards */}
+                {/* Enhanced Metrics Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                        <div className="flex items-center">
-                            <div className="flex-shrink-0">
-                                <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                                    <span className="text-blue-600">📤</span>
-                                </div>
-                            </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-600">Total Uploads</p>
-                                <p className="text-2xl font-bold text-gray-900">
-                                    {metrics.totalUploads.toLocaleString()}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                        <div className="flex items-center">
-                            <div className="flex-shrink-0">
-                                <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
-                                    <span className="text-red-600">❌</span>
-                                </div>
-                            </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-600">Failed Uploads</p>
-                                <p className="text-2xl font-bold text-gray-900">
-                                    {metrics.failedUploads.toLocaleString()}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                        <div className="flex items-center">
-                            <div className="flex-shrink-0">
-                                <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                                    <span className="text-green-600">🔍</span>
-                                </div>
-                            </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-600">Total Queries</p>
-                                <p className="text-2xl font-bold text-gray-900">
-                                    {metrics.totalQueries.toLocaleString()}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                        <div className="flex items-center">
-                            <div className="flex-shrink-0">
-                                <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
-                                    <span className="text-yellow-600">⚠️</span>
-                                </div>
-                            </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-600">Failed Queries</p>
-                                <p className="text-2xl font-bold text-gray-900">
-                                    {metrics.failedQueries.toLocaleString()}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
+                    <MetricCard
+                        title="Total Uploads"
+                        value={metrics.totalUploads}
+                        icon={Icons.Upload}
+                        color="blue"
+                        trend="+12%"
+                    />
+                    <MetricCard
+                        title="Failed Uploads"
+                        value={metrics.failedUploads}
+                        icon={Icons.Error}
+                        color="red"
+                    />
+                    <MetricCard
+                        title="Total Queries"
+                        value={metrics.totalQueries}
+                        icon={Icons.Search}
+                        color="green"
+                        trend="+8%"
+                    />
+                    <MetricCard
+                        title="Failed Queries"
+                        value={metrics.failedQueries}
+                        icon={Icons.Error}
+                        color="yellow"
+                    />
                 </div>
 
-                {/* Charts */}
+                {/* Enhanced Charts */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-                    {/* Overview Bar Chart */}
-                    <div className="lg:col-span-2 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Overview</h3>
-                        <ResponsiveContainer width="100%" height={300}>
-                            <BarChart data={chartData?.overview}>
+                    {/* Stacked Bar Chart */}
+                    <div className="lg:col-span-2 bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 p-6">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-6">Success vs Failure Rate</h3>
+                        <ResponsiveContainer width="100%" height={320}>
+                            <BarChart data={chartData?.overview} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                                 <XAxis dataKey="name" stroke="#6B7280" fontSize={12} />
                                 <YAxis stroke="#6B7280" fontSize={12} />
-                                <Tooltip
-                                    contentStyle={{
-                                        backgroundColor: 'white',
-                                        border: '1px solid #E5E7EB',
-                                        borderRadius: '8px'
-                                    }}
-                                />
-                                <Bar dataKey="value" fill="#3B82F6" radius={[4, 4, 0, 0]} />
+                                <Tooltip content={<CustomTooltip />} />
+                                <Bar dataKey="successful" stackId="a" fill="#10B981" radius={[0, 0, 0, 0]} />
+                                <Bar dataKey="failed" stackId="a" fill="#EF4444" radius={[4, 4, 0, 0]} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
 
-                    {/* Upload Success Rate */}
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Upload Success Rate</h3>
-                        <ResponsiveContainer width="100%" height={300}>
+                    {/* Enhanced Donut Chart */}
+                    <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 p-6">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-6">Upload Distribution</h3>
+                        <ResponsiveContainer width="100%" height={320}>
                             <PieChart>
                                 <Pie
                                     data={chartData?.uploadSuccess}
                                     cx="50%"
                                     cy="50%"
-                                    innerRadius={60}
-                                    outerRadius={100}
-                                    paddingAngle={5}
+                                    innerRadius={70}
+                                    outerRadius={120}
+                                    paddingAngle={2}
                                     dataKey="value"
                                 >
                                     {chartData?.uploadSuccess.map((entry, index) => (
                                         <Cell key={`cell-${index}`} fill={entry.color} />
                                     ))}
                                 </Pie>
-                                <Tooltip />
+                                <Tooltip content={<CustomTooltip />} />
                             </PieChart>
                         </ResponsiveContainer>
+                        <div className="flex justify-center space-x-6 mt-4">
+                            {chartData?.uploadSuccess.map((entry, index) => (
+                                <div key={index} className="flex items-center space-x-2">
+                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }}></div>
+                                    <span className="text-sm text-gray-600">{entry.name}</span>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
 
-                {/* Data Tables */}
+                {/* Enhanced Data Tables */}
                 <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8">
                     {/* Recent Uploads */}
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                        <div className="px-6 py-4 border-b border-gray-200">
+                    <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden">
+                        <div className="px-6 py-4 border-b border-gray-200/50 bg-gray-50/50">
                             <h3 className="text-lg font-semibold text-gray-900">
                                 Recent Uploads ({recentUploads.length})
                             </h3>
                         </div>
                         <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50">
+                            <table className="min-w-full">
+                                <thead className="bg-gray-50/50">
                                     <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Status
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Size
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Chunks
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Time
-                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Chunks</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
                                     </tr>
                                 </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
+                                <tbody className="divide-y divide-gray-200/50">
                                     {recentUploads.slice(0, 10).map((upload) => (
-                                        <tr key={upload.id} className="hover:bg-gray-50">
+                                        <tr key={upload.id} className="hover:bg-gray-50/50 transition-colors">
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${upload.success
-                                                        ? 'bg-green-100 text-green-800'
-                                                        : 'bg-red-100 text-red-800'
-                                                    }`}>
-                                                    {upload.success ? '✓ Success' : '✗ Failed'}
-                                                </span>
+                                                <StatusBadge success={upload.success} />
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                                 {formatFileSize(upload.size)}
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                                                 {upload.totalChunks}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -446,46 +532,35 @@ const fetchDashboardData = useCallback(async (isRefresh = false) => {
                     </div>
 
                     {/* Recent Queries */}
-                    <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                        <div className="px-6 py-4 border-b border-gray-200">
+                    <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden">
+                        <div className="px-6 py-4 border-b border-gray-200/50 bg-gray-50/50">
                             <h3 className="text-lg font-semibold text-gray-900">
                                 Recent Queries ({recentQueries.length})
                             </h3>
                         </div>
                         <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50">
+                            <table className="min-w-full">
+                                <thead className="bg-gray-50/50">
                                     <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Status
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            User
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Segment
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Time
-                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Segment</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
                                     </tr>
                                 </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
+                                <tbody className="divide-y divide-gray-200/50">
                                     {recentQueries.slice(0, 10).map((query) => (
-                                        <tr key={query.id} className="hover:bg-gray-50">
+                                        <tr key={query.id} className="hover:bg-gray-50/50 transition-colors">
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${query.success
-                                                        ? 'bg-green-100 text-green-800'
-                                                        : 'bg-red-100 text-red-800'
-                                                    }`}>
-                                                    {query.success ? '✓ Success' : '✗ Failed'}
-                                                </span>
+                                                <StatusBadge success={query.success} />
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                                 {query.userId}
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono text-xs">
-                                                {query.segmentId.length > 20 ? query.segmentId.substring(0, 20) + '...' : query.segmentId}
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
+                                                <span className="bg-gray-100 px-2 py-1 rounded text-xs">
+                                                    {query.segmentId.length > 15 ? query.segmentId.substring(0, 15) + '...' : query.segmentId}
+                                                </span>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                                 {formatDate(query.createdAt)}
@@ -498,54 +573,54 @@ const fetchDashboardData = useCallback(async (isRefresh = false) => {
                     </div>
                 </div>
 
-                {/* IP Activity */}
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-                    <div className="px-6 py-4 border-b border-gray-200">
-                        <h3 className="text-lg font-semibold text-gray-900">
-                            Recent IP Activity ({recentIPs.length})
-                        </h3>
+                {/* Enhanced IP Activity */}
+                <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden">
+                    <div className="px-6 py-4 border-b border-gray-200/50 bg-gray-50/50">
+                        <div className="flex items-center space-x-2">
+                            <Icons.Globe />
+
+                            <h3 className="text-lg font-semibold text-gray-900">
+                                Recent IP Activity ({recentIPs.length})
+                            </h3>
+                        </div>
                     </div>
                     <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
+                        <table className="min-w-full">
+                            <thead className="bg-gray-50/50">
                                 <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        IP Address
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Browser & Device
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        User Agent (Full)
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Requests
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Last Seen
-                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP Address</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Browser & Device</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User Agent</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Requests</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Seen</th>
                                 </tr>
                             </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
+                            <tbody className="divide-y divide-gray-200/50">
                                 {recentIPs.map((ip, index) => {
                                     const browserInfo = getBrowserInfo(ip.userAgent);
                                     return (
-                                        <tr key={index} className="hover:bg-gray-50">
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
-                                                {ip.ipAddress}
+                                        <tr key={index} className="hover:bg-gray-50/50 transition-colors">
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <span className="text-sm font-mono text-gray-900 bg-gray-100 px-2 py-1 rounded">
+                                                    {ip.ipAddress}
+                                                </span>
                                             </td>
-                                            <td className="px-6 py-4 text-sm text-gray-500">
-                                                <div className="flex items-center space-x-2">
-                                                    <span>{getDeviceIcon(browserInfo.device)}</span>
-                                                    <span className="truncate max-w-xs">{browserInfo.browser}</span>
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center space-x-3">
+                                                    <span className="text-lg">{browserInfo.icon}</span>
+                                                    <div>
+                                                        <div className="text-sm font-medium text-gray-900">{browserInfo.browser}</div>
+                                                        <div className="text-xs text-gray-500 capitalize">{browserInfo.device}</div>
+                                                    </div>
                                                 </div>
                                             </td>
-                                            {/* FULL USER AGENT DISPLAY */}
-                                            <td className="px-6 py-4 text-sm text-gray-500 font-mono max-w-md truncate" title={ip.userAgent}>
-                                                {ip.userAgent}
+                                            <td className="px-6 py-4 max-w-xs">
+                                                <div className="text-xs text-gray-500 font-mono truncate" title={ip.userAgent}>
+                                                    {ip.userAgent}
+                                                </div>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
                                                     {ip.count} requests
                                                 </span>
                                             </td>
@@ -560,6 +635,11 @@ const fetchDashboardData = useCallback(async (isRefresh = false) => {
                     </div>
                 </div>
 
+                {/* Footer with additional info */}
+                <div className="mt-8 text-center text-sm text-gray-500">
+                    <p>Dashboard automatically refreshes every 30 seconds</p>
+                    <p className="mt-1">Connected to: {API_BASE_URL}</p>
+                </div>
             </main>
         </div>
     );
