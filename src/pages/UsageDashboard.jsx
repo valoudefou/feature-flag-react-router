@@ -206,35 +206,362 @@ const fetchDashboardData = useCallback(async (isRefresh = false) => {
     const { metrics, recentUploads, recentQueries, recentIPs } = dashboardData;
 
     return (
-       <header className="bg-white/80 backdrop-blur-md border-b border-gray-200 sticky top-0 z-10">
-  <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-    <div className="flex justify-between items-center py-4">
-      <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Usage Dashboard</h1>
+        <div className="min-h-screen bg-gray-50">
 
-      <div className="flex items-center space-x-6">
-        {/* Status pill */}
-        <div className={`flex items-center px-3 py-1 rounded-full text-sm font-medium ${isOnline ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-          <span className="w-2 h-2 mr-2 rounded-full bg-current" />
-          {isOnline ? "Online" : "Offline"}
+       {/* Header */}
+<header className="bg-white shadow-sm border-b border-gray-200">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center py-6">
+            <div>
+                <h1 className="text-3xl font-bold text-gray-900">Usage Dashboard</h1>
+            </div>
+            <div className="flex items-center space-x-4">
+                {/* Connection Status */}
+                <div className="flex items-center space-x-2">
+                    <div className={`w-3 h-3 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                    <span className={`text-sm font-medium ${isOnline ? 'text-green-700' : 'text-red-700'}`}>
+                        {isOnline ? 'Online' : 'Offline'}
+                    </span>
+                </div>
+                
+                {/* Last Updated */}
+                <div className="text-sm text-gray-500">
+                    Last updated: {new Date().toLocaleTimeString()}
+                </div>
+                
+                {/* Refresh Button */}
+                <button
+                    onClick={() => fetchDashboardData(true)}
+                    disabled={refreshing}
+                    className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+                >
+                    <span className={refreshing ? 'animate-spin' : ''}>🔄</span>
+                    <span>{refreshing ? 'Refreshing...' : 'Refresh'}</span>
+                </button>
+            </div>
         </div>
-
-        {/* Last Updated */}
-        <span className="text-xs text-gray-500">⏱ {new Date().toLocaleTimeString()}</span>
-
-        {/* Refresh */}
-        <button
-          onClick={() => fetchDashboardData(true)}
-          disabled={refreshing}
-          className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white shadow-sm transition-all"
-        >
-          <span className={refreshing ? "animate-spin" : ""}>🔄</span>
-          <span>{refreshing ? "Refreshing..." : "Refresh"}</span>
-        </button>
-      </div>
     </div>
-  </div>
 </header>
 
+            <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          
+
+                {/* Filters */}
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Filters</h2>
+                    <div className="flex flex-wrap gap-6">
+                        <div className="flex flex-col">
+                            <label className="text-sm font-medium text-gray-700 mb-2">Upload Filter</label>
+                            <select
+                                value={uploadFilter}
+                                onChange={(e) => updateFilter('uploadFilter', e.target.value)}
+                                className="border border-gray-300 rounded-lg px-3 py-2 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            >
+                                <option value="all">All Uploads</option>
+                                <option value="success">Successful Only</option>
+                                <option value="failed">Failed Only</option>
+                            </select>
+                        </div>
+                        <div className="flex flex-col">
+                            <label className="text-sm font-medium text-gray-700 mb-2">Limit</label>
+                            <select
+                                value={limit}
+                                onChange={(e) => updateFilter('limit', e.target.value)}
+                                className="border border-gray-300 rounded-lg px-3 py-2 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            >
+                                <option value="25">25 Records</option>
+                                <option value="50">50 Records</option>
+                                <option value="100">100 Records</option>
+                                <option value="200">200 Records</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Metrics Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                        <div className="flex items-center">
+                            <div className="flex-shrink-0">
+                                <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                                    <span className="text-blue-600">📤</span>
+                                </div>
+                            </div>
+                            <div className="ml-4">
+                                <p className="text-sm font-medium text-gray-600">Total Uploads</p>
+                                <p className="text-2xl font-bold text-gray-900">
+                                    {metrics.totalUploads.toLocaleString()}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                        <div className="flex items-center">
+                            <div className="flex-shrink-0">
+                                <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
+                                    <span className="text-red-600">❌</span>
+                                </div>
+                            </div>
+                            <div className="ml-4">
+                                <p className="text-sm font-medium text-gray-600">Failed Uploads</p>
+                                <p className="text-2xl font-bold text-gray-900">
+                                    {metrics.failedUploads.toLocaleString()}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                        <div className="flex items-center">
+                            <div className="flex-shrink-0">
+                                <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                                    <span className="text-green-600">🔍</span>
+                                </div>
+                            </div>
+                            <div className="ml-4">
+                                <p className="text-sm font-medium text-gray-600">Total Queries</p>
+                                <p className="text-2xl font-bold text-gray-900">
+                                    {metrics.totalQueries.toLocaleString()}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                        <div className="flex items-center">
+                            <div className="flex-shrink-0">
+                                <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
+                                    <span className="text-yellow-600">⚠️</span>
+                                </div>
+                            </div>
+                            <div className="ml-4">
+                                <p className="text-sm font-medium text-gray-600">Failed Queries</p>
+                                <p className="text-2xl font-bold text-gray-900">
+                                    {metrics.failedQueries.toLocaleString()}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Charts */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+                    {/* Overview Bar Chart */}
+                    <div className="lg:col-span-2 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Overview</h3>
+                        <ResponsiveContainer width="100%" height={300}>
+                            <BarChart data={chartData?.overview}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                                <XAxis dataKey="name" stroke="#6B7280" fontSize={12} />
+                                <YAxis stroke="#6B7280" fontSize={12} />
+                                <Tooltip
+                                    contentStyle={{
+                                        backgroundColor: 'white',
+                                        border: '1px solid #E5E7EB',
+                                        borderRadius: '8px'
+                                    }}
+                                />
+                                <Bar dataKey="value" fill="#3B82F6" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+
+                    {/* Upload Success Rate */}
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Upload Success Rate</h3>
+                        <ResponsiveContainer width="100%" height={300}>
+                            <PieChart>
+                                <Pie
+                                    data={chartData?.uploadSuccess}
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={60}
+                                    outerRadius={100}
+                                    paddingAngle={5}
+                                    dataKey="value"
+                                >
+                                    {chartData?.uploadSuccess.map((entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                    ))}
+                                </Pie>
+                                <Tooltip />
+                            </PieChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                {/* Data Tables */}
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8">
+                    {/* Recent Uploads */}
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+                        <div className="px-6 py-4 border-b border-gray-200">
+                            <h3 className="text-lg font-semibold text-gray-900">
+                                Recent Uploads ({recentUploads.length})
+                            </h3>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Status
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Size
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Chunks
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Time
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {recentUploads.slice(0, 10).map((upload) => (
+                                        <tr key={upload.id} className="hover:bg-gray-50">
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${upload.success
+                                                        ? 'bg-green-100 text-green-800'
+                                                        : 'bg-red-100 text-red-800'
+                                                    }`}>
+                                                    {upload.success ? '✓ Success' : '✗ Failed'}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {formatFileSize(upload.size)}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {upload.totalChunks}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                {formatDate(upload.createdAt)}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    {/* Recent Queries */}
+                    <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+                        <div className="px-6 py-4 border-b border-gray-200">
+                            <h3 className="text-lg font-semibold text-gray-900">
+                                Recent Queries ({recentQueries.length})
+                            </h3>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Status
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            User
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Segment
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Time
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {recentQueries.slice(0, 10).map((query) => (
+                                        <tr key={query.id} className="hover:bg-gray-50">
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${query.success
+                                                        ? 'bg-green-100 text-green-800'
+                                                        : 'bg-red-100 text-red-800'
+                                                    }`}>
+                                                    {query.success ? '✓ Success' : '✗ Failed'}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                                {query.userId}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono text-xs">
+                                                {query.segmentId.length > 20 ? query.segmentId.substring(0, 20) + '...' : query.segmentId}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                {formatDate(query.createdAt)}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                {/* IP Activity */}
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+                    <div className="px-6 py-4 border-b border-gray-200">
+                        <h3 className="text-lg font-semibold text-gray-900">
+                            Recent IP Activity ({recentIPs.length})
+                        </h3>
+                    </div>
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full divide-y divide-gray-200">
+                            <thead className="bg-gray-50">
+                                <tr>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        IP Address
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Browser & Device
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        User Agent (Full)
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Requests
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Last Seen
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                                {recentIPs.map((ip, index) => {
+                                    const browserInfo = getBrowserInfo(ip.userAgent);
+                                    return (
+                                        <tr key={index} className="hover:bg-gray-50">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
+                                                {ip.ipAddress}
+                                            </td>
+                                            <td className="px-6 py-4 text-sm text-gray-500">
+                                                <div className="flex items-center space-x-2">
+                                                    <span>{getDeviceIcon(browserInfo.device)}</span>
+                                                    <span className="truncate max-w-xs">{browserInfo.browser}</span>
+                                                </div>
+                                            </td>
+                                            {/* FULL USER AGENT DISPLAY */}
+                                            <td className="px-6 py-4 text-sm text-gray-500 font-mono max-w-md truncate" title={ip.userAgent}>
+                                                {ip.userAgent}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                                    {ip.count} requests
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                {formatDate(ip.lastSeen)}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </main>
+        </div>
     );
 };
 
