@@ -523,9 +523,9 @@ const UsageDashboard = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                             {upload.totalChunks}
                         </td>
-                 <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
+                 <td className="px-6 py-4 text-sm text-gray-600">
     {!upload.success && upload.error ? (
-        <div className="bg-red-50 text-red-700 px-2 py-1 rounded text-xs border border-red-200 truncate whitespace-nowrap overflow-hidden">
+        <div className="bg-red-50 text-red-700 px-2 py-1 rounded text-xs border border-red-200 whitespace-nowrap">
             {upload.error}
         </div>
     ) : (
