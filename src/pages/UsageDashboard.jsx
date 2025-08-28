@@ -80,6 +80,7 @@ const LoadingSkeleton = () => (
 
 // Status Badge Component
 const StatusBadge = ({ success, type = 'default', errorMessage }) => {
+    const [hovered, setHovered] = useState(false);
     const variants = {
         success: 'bg-emerald-50 text-emerald-700 border-emerald-200',
         error: 'bg-red-50 text-red-700 border-red-200',
@@ -89,18 +90,25 @@ const StatusBadge = ({ success, type = 'default', errorMessage }) => {
     };
 
     return (
- <span
-    className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold border transition-colors duration-200 
-        ${success ? 'bg-emerald-50 text-emerald-800 border-emerald-300' : 'bg-red-50 text-red-800 border-red-300'}
-        hover:shadow-md hover:scale-105`}
-    title={!success && errorMessage ? errorMessage : undefined} // show tooltip only on failure
->
-    <span
-        className={`w-2 h-2 rounded-full mr-2 ${success ? 'bg-emerald-400' : 'bg-red-400'}`}
-    ></span>
-    {success ? 'Success' : 'Failed'}
-</span>
+       <span 
+            className="relative inline-block"
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => setHovered(false)}
+        >
+            <span
+                className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border ${variants[type] || variants.default}`}
+            >
+                <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${success ? 'bg-emerald-400' : 'bg-red-400'}`}></span>
+                {success ? 'Success' : 'Failed'}
+            </span>
 
+            {/* Tooltip */}
+            {!success && errorMessage && hovered && (
+                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 text-xs text-white bg-gray-800 rounded shadow-lg whitespace-nowrap z-10">
+                    {errorMessage}
+                </div>
+            )}
+        </span>
     );
 };
 
