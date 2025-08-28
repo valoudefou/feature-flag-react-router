@@ -140,7 +140,7 @@ const MetricCard = ({ title, value, icon: Icon, trend, color = 'blue' }) => {
                     <Icon />
                 </div>
                 {trend && (
-                    <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
+                    <span className="text-md font-semibold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
                         {trend}
                     </span>
                 )}
