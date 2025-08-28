@@ -523,15 +523,16 @@ const UsageDashboard = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                             {upload.totalChunks}
                         </td>
-                        <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
-                            {!upload.success && upload.error ? (
-                                <div className="bg-red-50 text-red-700 px-2 py-1 rounded text-xs border border-red-200 break-words">
-                                    {upload.error}
-                                </div>
-                            ) : (
-                                <span className="text-gray-400">-</span>
-                            )}
-                        </td>
+                 <td className="px-6 py-4 text-sm text-gray-600 max-w-xs">
+    {!upload.success && upload.error ? (
+        <div className="bg-red-50 text-red-700 px-2 py-1 rounded text-xs border border-red-200 truncate whitespace-nowrap overflow-hidden">
+            {upload.error}
+        </div>
+    ) : (
+        <span className="text-gray-400">-</span>
+    )}
+</td>
+
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             {formatDate(upload.createdAt)}
                         </td>
