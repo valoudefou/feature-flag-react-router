@@ -26,6 +26,9 @@ const UsageDashboard = () => {
   const uploadFilter = searchParams.get('uploadFilter') || 'all';
   const limit = parseInt(searchParams.get('limit')) || 50;
 
+  // API Base URL - Updated to use your live server
+  const API_BASE_URL = 'https://live-server1.com';
+
   // Fetch dashboard data
   const fetchDashboardData = useCallback(async (isRefresh = false) => {
     try {
@@ -35,23 +38,35 @@ const UsageDashboard = () => {
         setLoading(true);
       }
 
-      const response = await fetch(`/api/usage?uploadFilter=${uploadFilter}&limit=${limit}`);
+      console.log(`Fetching data from: ${API_BASE_URL}/api/usage?uploadFilter=${uploadFilter}&limit=${limit}`);
+
+      const response = await fetch(`${API_BASE_URL}/api/usage?uploadFilter=${uploadFilter}&limit=${limit}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          // Add any additional headers if needed for CORS or authentication
+        },
+        // Add credentials if your API requires authentication
+        // credentials: 'include',
+      });
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
       }
       
       const data = await response.json();
+      console.log('API Response:', data);
+      
       setDashboardData(data);
       setError(null);
     } catch (err) {
-      setError(err.message);
       console.error('Error fetching dashboard data:', err);
+      setError(`Failed to fetch data: ${err.message}`);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [uploadFilter, limit]);
+  }, [uploadFilter, limit, API_BASE_URL]);
 
   // Update URL params
   const updateFilter = useCallback((key, value) => {
@@ -124,10 +139,11 @@ const UsageDashboard = () => {
     let browser = 'Unknown';
     let device = 'desktop';
     
-    if (userAgent.includes('Chrome')) browser = 'Chrome';
+    if (userAgent.includes('Chrome') && !userAgent.includes('Edge')) browser = 'Chrome';
     else if (userAgent.includes('Firefox')) browser = 'Firefox';
     else if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) browser = 'Safari';
     else if (userAgent.includes('Edge')) browser = 'Edge';
+    else if (userAgent.includes('CriOS')) browser = 'Chrome iOS';
     
     if (userAgent.includes('Mobile') || userAgent.includes('iPhone')) device = 'mobile';
     else if (userAgent.includes('iPad')) device = 'tablet';
@@ -149,6 +165,7 @@ const UsageDashboard = () => {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Loading dashboard...</p>
+          <p className="text-sm text-gray-500 mt-2">Connecting to {API_BASE_URL}</p>
         </div>
       </div>
     );
@@ -157,10 +174,11 @@ const UsageDashboard = () => {
   if (error && !dashboardData) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center bg-white p-8 rounded-lg shadow-lg">
+        <div className="text-center bg-white p-8 rounded-lg shadow-lg max-w-md">
           <div className="text-red-500 text-6xl mb-4">⚠️</div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Error Loading Dashboard</h2>
           <p className="text-gray-600 mb-4">{error}</p>
+          <p className="text-sm text-gray-500 mb-4">API URL: {API_BASE_URL}/api/usage</p>
           <button
             onClick={() => fetchDashboardData()}
             className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors"
@@ -190,7 +208,7 @@ const UsageDashboard = () => {
           <div className="flex justify-between items-center py-6">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Usage Dashboard</h1>
-              <p className="text-gray-600 mt-1">Real-time analytics and monitoring</p>
+              <p className="text-gray-600 mt-1">Real-time analytics from {API_BASE_URL}</p>
             </div>
             <div className="flex items-center space-x-4">
               <div className="text-sm text-gray-500">
@@ -210,6 +228,20 @@ const UsageDashboard = () => {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Connection Status */}
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+          <div className="flex items-center">
+            <div className="flex-shrink-0">
+              <span className="text-green-500">✅</span>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-green-800">
+                Connected to API: <span className="font-mono">{API_BASE_URL}/api/usage</span>
+              </p>
+            </div>
+          </div>
+        </div>
+
         {/* Filters */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
           <h2 className="text-lg font-semibold text-gray-900 mb-4">Filters</h2>
@@ -451,7 +483,7 @@ const UsageDashboard = () => {
                         {query.userId}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono text-xs">
-                        {query.segmentId.substring(0, 20)}...
+                        {query.segmentId.length > 20 ? query.segmentId.substring(0, 20) + '...' : query.segmentId}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {formatDate(query.createdAt)}
