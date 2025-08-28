@@ -78,7 +78,7 @@ const LoadingSkeleton = () => (
     </div>
 );
 
-// Status Badge Component
+// Status Badge Component with CSS-only tooltip
 const StatusBadge = ({ success, type = 'default', errorMessage }) => {
     const variants = {
         success: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -92,26 +92,24 @@ const StatusBadge = ({ success, type = 'default', errorMessage }) => {
         <div className="relative inline-block group">
             <span
                 className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border transition-all duration-200 ${
-                    !success && errorMessage ? 'cursor-help' : ''
+                    !success && errorMessage ? 'cursor-help hover:shadow-md' : ''
                 } ${variants[type] || variants.default}`}
             >
                 <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${success ? 'bg-emerald-400' : 'bg-red-400'}`}></span>
                 {success ? 'Success' : 'Failed'}
             </span>
             
-            {/* Tooltip */}
+            {/* Enhanced Tooltip */}
             {!success && errorMessage && (
-                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 max-w-xs break-words whitespace-normal">
+                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 max-w-xs break-words whitespace-normal border border-gray-700">
                     {errorMessage}
                     {/* Arrow */}
-                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45"></div>
+                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45 border-r border-b border-gray-700"></div>
                 </div>
             )}
         </div>
     );
 };
-
-
 
 // Metric Card Component
 const MetricCard = ({ title, value, icon: Icon, trend, color = 'blue' }) => {
@@ -145,8 +143,8 @@ const MetricCard = ({ title, value, icon: Icon, trend, color = 'blue' }) => {
     );
 };
 
-// Custom Tooltip Component
-const CustomTooltip = ({ active, payload, label }) => {
+// Custom Tooltip Component for Charts (renamed to avoid conflict)
+const CustomChartTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
         return (
             <div className="bg-white p-3 rounded-lg shadow-lg border border-gray-200">
@@ -161,101 +159,6 @@ const CustomTooltip = ({ active, payload, label }) => {
     }
     return null;
 };
-
-// Tooltip Component
-const Tooltip = ({ children, content, position = 'top' }) => {
-    const [isVisible, setIsVisible] = useState(false);
-    const [tooltipStyle, setTooltipStyle] = useState({});
-    const tooltipRef = useRef(null);
-    const triggerRef = useRef(null);
-
-    const showTooltip = () => {
-        setIsVisible(true);
-        // Calculate position after showing
-        setTimeout(() => {
-            if (tooltipRef.current && triggerRef.current) {
-                const triggerRect = triggerRef.current.getBoundingClientRect();
-                const tooltipRect = tooltipRef.current.getBoundingClientRect();
-                
-                let top, left;
-                
-                switch (position) {
-                    case 'top':
-                        top = triggerRect.top - tooltipRect.height - 8;
-                        left = triggerRect.left + (triggerRect.width - tooltipRect.width) / 2;
-                        break;
-                    case 'bottom':
-                        top = triggerRect.bottom + 8;
-                        left = triggerRect.left + (triggerRect.width - tooltipRect.width) / 2;
-                        break;
-                    case 'left':
-                        top = triggerRect.top + (triggerRect.height - tooltipRect.height) / 2;
-                        left = triggerRect.left - tooltipRect.width - 8;
-                        break;
-                    case 'right':
-                        top = triggerRect.top + (triggerRect.height - tooltipRect.height) / 2;
-                        left = triggerRect.right + 8;
-                        break;
-                    default:
-                        top = triggerRect.top - tooltipRect.height - 8;
-                        left = triggerRect.left + (triggerRect.width - tooltipRect.width) / 2;
-                }
-
-                // Ensure tooltip stays within viewport
-                const padding = 8;
-                if (left < padding) left = padding;
-                if (left + tooltipRect.width > window.innerWidth - padding) {
-                    left = window.innerWidth - tooltipRect.width - padding;
-                }
-                if (top < padding) top = triggerRect.bottom + 8;
-
-                setTooltipStyle({
-                    position: 'fixed',
-                    top: `${top}px`,
-                    left: `${left}px`,
-                    zIndex: 9999
-                });
-            }
-        }, 0);
-    };
-
-    const hideTooltip = () => {
-        setIsVisible(false);
-    };
-
-    return (
-        <>
-            <div
-                ref={triggerRef}
-                onMouseEnter={showTooltip}
-                onMouseLeave={hideTooltip}
-                className="inline-block"
-            >
-                {children}
-            </div>
-            
-            {isVisible && content && (
-                <div
-                    ref={tooltipRef}
-                    style={tooltipStyle}
-                    className="animate-in fade-in-0 zoom-in-95 duration-200"
-                >
-                    <div className="bg-gray-900 text-white text-sm px-3 py-2 rounded-lg shadow-lg border border-gray-700 max-w-xs break-words relative">
-                        {content}
-                        {/* Arrow */}
-                        <div className={`absolute w-2 h-2 bg-gray-900 border-gray-700 transform rotate-45 ${
-                            position === 'top' ? 'bottom-[-4px] left-1/2 -translate-x-1/2 border-r border-b' :
-                            position === 'bottom' ? 'top-[-4px] left-1/2 -translate-x-1/2 border-l border-t' :
-                            position === 'left' ? 'right-[-4px] top-1/2 -translate-y-1/2 border-t border-r' :
-                            'left-[-4px] top-1/2 -translate-y-1/2 border-b border-l'
-                        }`}></div>
-                    </div>
-                </div>
-            )}
-        </>
-    );
-};
-
 
 const UsageDashboard = () => {
     const [searchParams, setSearchParams] = useSearchParams();
@@ -527,7 +430,7 @@ const UsageDashboard = () => {
                                 <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
                                 <XAxis dataKey="name" stroke="#6B7280" fontSize={12} />
                                 <YAxis stroke="#6B7280" fontSize={12} />
-                                <Tooltip content={<CustomTooltip />} />
+                                <Tooltip content={<CustomChartTooltip />} />
                                 <Bar dataKey="successful" stackId="a" fill="#10B981" radius={[0, 0, 0, 0]} />
                                 <Bar dataKey="failed" stackId="a" fill="#EF4444" radius={[4, 4, 0, 0]} />
                             </BarChart>
@@ -552,7 +455,7 @@ const UsageDashboard = () => {
                                         <Cell key={`cell-${index}`} fill={entry.color} />
                                     ))}
                                 </Pie>
-                                <Tooltip content={<CustomTooltip />} />
+                                <Tooltip content={<CustomChartTooltip />} />
                             </PieChart>
                         </ResponsiveContainer>
                         <div className="flex justify-center space-x-6 mt-4">
@@ -668,11 +571,15 @@ const UsageDashboard = () => {
                                             <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                                                 {query.userId}
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
-                                                <span className="bg-gray-100 px-2 py-1 rounded text-xs">
-                                                    {query.segmentId.length > 15 ? query.segmentId.substring(0, 15) + '...' : query.segmentId}
-                                                </span>
-                                            </td>
+                                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
+    <span className="bg-gray-100 px-2 py-1 rounded text-xs">
+        {query.segmentId.length > 15 
+            ? query.segmentId.substring(0, 15) + '...' 
+            : query.segmentId
+        }
+    </span>
+</td>
+
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                                 {formatDate(query.createdAt)}
                                             </td>
