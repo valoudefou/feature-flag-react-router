@@ -80,7 +80,19 @@ function AppWithThemeAndFlags() {
 
       // Toggle logs on pressing "L" or "l"
       if (e.key.toLowerCase() === 'l') {
-        setShowLogs((prev) => !prev);
+        setShowLogs((prev) => {
+          const next = !prev;
+          localStorage.setItem('showLogs', next); // ✅ persist
+          return next;
+        });
+      }
+
+      // Reset logs with Shift+L (optional)
+      if (e.key.toLowerCase() === 'l' && e.shiftKey) {
+        setShowLogs(true);
+        setLogHeight(300);
+        localStorage.setItem('showLogs', true);
+        localStorage.setItem('logHeight', 300);
       }
     };
 
@@ -89,6 +101,7 @@ function AppWithThemeAndFlags() {
       window.removeEventListener('keydown', handleKeydown);
     };
   }, []);
+
 
   // Handle drag functionality
   const handleMouseDown = (e) => {
@@ -151,7 +164,7 @@ function AppWithThemeAndFlags() {
               <span className="text-xs">●</span>
               <span>{showLogs ? 'HIDE LOGS' : 'SHOW LOGS'}</span>
               <span className="text-xs opacity-60">
-                [Ctrl+Shift+L]
+                [Press L]
               </span>
             </button>
           </div>
