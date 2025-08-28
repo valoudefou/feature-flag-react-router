@@ -16,6 +16,9 @@ import {
     Area,
     AreaChart
 } from 'recharts';
+import { Tooltip } from 'react-tooltip';
+
+
 
 // Modern Icons Component
 const Icons = {
@@ -89,25 +92,34 @@ const StatusBadge = ({ success, type = 'default', errorMessage }) => {
     };
 
     return (
-        <div className="relative inline-block group">
-            <span
-                className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border transition-all duration-200 ${
-                    !success && errorMessage ? 'cursor-help hover:shadow-md' : ''
-                } ${variants[type] || variants.default}`}
-            >
-                <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${success ? 'bg-emerald-400' : 'bg-red-400'}`}></span>
-                {success ? 'Success' : 'Failed'}
-            </span>
-            
-            {/* Enhanced Tooltip */}
-            {!success && errorMessage && (
-                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 max-w-xs break-words whitespace-normal border border-gray-100">
-                    {errorMessage}
-                    {/* Arrow */}
-                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 w-2 h-2 bg-gray-900 rotate-45 border-r border-b border-gray-700"></div>
-                </div>
-            )}
-        </div>
+    <>
+      <span
+        data-tooltip-id={tooltipId}
+        data-tooltip-content={!success && errorMessage ? errorMessage : ''}
+        className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border transition-all duration-200 ${
+          !success && errorMessage ? 'cursor-help hover:shadow-md' : ''
+        } ${variants[type] || variants.default}`}
+      >
+        <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${success ? 'bg-emerald-400' : 'bg-red-400'}`}></span>
+        {success ? 'Success' : 'Failed'}
+      </span>
+      
+      {!success && errorMessage && (
+        <Tooltip
+          id={tooltipId}
+          place="top"
+          style={{
+            backgroundColor: '#1f2937',
+            color: 'white',
+            borderRadius: '8px',
+            fontSize: '14px',
+            maxWidth: '300px',
+            wordWrap: 'break-word',
+            zIndex: 50
+          }}
+        />
+      )}
+    </>
     );
 };
 
