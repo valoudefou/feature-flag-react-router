@@ -1,638 +1,526 @@
-import { useState, useEffect, useContext, useMemo, useRef, useCallback } from 'react';
-import { useAuth } from '../auth/AuthProvider';
-import { ThemeContext } from '../App';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
-    BarChart,
-    Bar,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
-    ResponsiveContainer,
-    Legend,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  LineChart,
+  Line
 } from 'recharts';
 
-export default function UsageDashboard() {
-    const [data, setData] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [lastUpdated, setLastUpdated] = useState(null);
-    const [connectionStatus, setConnectionStatus] = useState('checking');
-    const [debugInfo, setDebugInfo] = useState([]);
-    const [serverReachable, setServerReachable] = useState(null);
-    const [retryCount, setRetryCount] = useState(0);
-    const [uploadFilter, setUploadFilter] = useState('all');
-    const [activeTab, setActiveTab] = useState('uploads');
+const UsageDashboard = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [dashboardData, setDashboardData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-    const { user } = useAuth();
-    const { theme } = useContext(ThemeContext);
+  // Get filter values from URL params
+  const uploadFilter = searchParams.get('uploadFilter') || 'all';
+  const limit = parseInt(searchParams.get('limit')) || 50;
 
-    // Refs to track intervals and prevent stale closures
-    const pollIntervalRef = useRef(null);
-    const healthCheckIntervalRef = useRef(null);
-    const isInitialMount = useRef(true);
-    const currentFilterRef = useRef('all'); // Track current filter
-
-    // Update filter ref whenever uploadFilter changes
-    useEffect(() => {
-        currentFilterRef.current = uploadFilter;
-        console.log('uploadFilter state changed to:', uploadFilter);
-    }, [uploadFilter]);
-
-    const displayUploads = useMemo(() => {
-        console.log('=== RENDER DEBUG ===');
-        console.log('uploadFilter state:', uploadFilter);
-        
-        if (!data?.recentUploads) {
-            console.log('No data available yet');
-            return [];
-        }
-        
-        const recentUploads = data.recentUploads;
-        console.log('recentUploads length:', recentUploads?.length);
-        console.log('recentUploads data:', recentUploads?.map(u => ({ id: u.id, success: u.success })));
-        
-        // Apply client-side filtering as backup
-        switch (uploadFilter) {
-            case 'failed':
-                const failed = recentUploads.filter(upload => upload.success === false);
-                console.log('Client-filtered failed uploads:', failed.length);
-                return failed;
-            case 'success':
-                const successful = recentUploads.filter(upload => upload.success === true);
-                console.log('Client-filtered successful uploads:', successful.length);
-                return successful;
-            default:
-                return recentUploads;
-        }
-    }, [data?.recentUploads, uploadFilter]);
-
-    // Mock data for offline mode
-    const mockData = {
-        metrics: {
-            totalUploads: 0,
-            failedUploads: 0,
-            totalQueries: 0,
-            failedQueries: 0
-        },
-        recentUploads: [],
-        recentQueries: [],
-        recentIPs: [],
-        filters: {
-            uploadFilter: 'all',
-            limit: 50
-        }
-    };
-
-    const addDebugLog = useCallback((message) => {
-        const timestamp = new Date().toLocaleTimeString();
-        setDebugInfo(prev => [`[${timestamp}] ${message}`, ...prev.slice(0, 9)]);
-        console.log(`[Dashboard] ${message}`);
-    }, []);
-
-    // FIXED: Memoized fetch function to prevent recreating on every render
-    const checkServerByFetchingData = useCallback(async (filters = {}) => {
-        const queryParams = new URLSearchParams({
-            uploadFilter: filters.uploadFilter || currentFilterRef.current,
-            limit: '50'
-        });
-
-        addDebugLog(`Testing server with filters: ${queryParams.toString()}`);
-        try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000);
-
-            const response = await fetch(`https://live-server1.com/api/usage?${queryParams}`, {
-                signal: controller.signal,
-                method: 'GET',
-                headers: {
-                    'Accept': 'application/json',
-                },
-            });
-
-            clearTimeout(timeoutId);
-
-            if (response.ok) {
-                addDebugLog('Server is reachable via /api/usage');
-                setServerReachable(true);
-                return { reachable: true, data: await response.json() };
-            } else {
-                addDebugLog(`Server responded with error: ${response.status}`);
-                setServerReachable(false);
-                return { reachable: false, data: null };
-            }
-        } catch (err) {
-            addDebugLog(`Server test failed: ${err.message}`);
-            setServerReachable(false);
-            return { reachable: false, data: null };
-        }
-    }, [addDebugLog]);
-
-    // FIXED: Memoized fetch function
-    const fetchUsage = useCallback(async (filters = {}) => {
-        addDebugLog('Starting fetch...');
-        setError(null);
-
-        const result = await checkServerByFetchingData(filters);
-
-        if (!result.reachable) {
-            addDebugLog('Server unreachable, using offline mode');
-            setData(mockData);
-            setLastUpdated(new Date());
-            setConnectionStatus('offline');
-            setLoading(false);
-            return;
-        }
-
-        try {
-            addDebugLog('Server is reachable, using fetched data');
-            setConnectionStatus('online');
-            setData(result.data);
-            console.log('=== FRONTEND DEBUG ===');
-            console.log('Filter requested:', filters.uploadFilter || currentFilterRef.current);
-            console.log('Server response uploads:', result.data.recentUploads);
-            console.log('Upload success distribution:', {
-                total: result.data.recentUploads?.length || 0,
-                successful: result.data.recentUploads?.filter(u => u.success).length || 0,
-                failed: result.data.recentUploads?.filter(u => !u.success).length || 0
-            });
-            console.log('Current uploadFilter state:', uploadFilter);
-            setLastUpdated(new Date());
-            setError(null);
-            setRetryCount(0);
-            addDebugLog('Data fetched successfully');
-            setServerReachable(true);
-
-        } catch (err) {
-            addDebugLog(`Data processing error: ${err.message}`);
-            setError('Error processing server data');
-            setData(mockData);
-            setConnectionStatus('offline');
-            setServerReachable(false);
-        } finally {
-            setLoading(false);
-        }
-    }, [addDebugLog, checkServerByFetchingData, uploadFilter]);
-
-    // FIXED: Separate function to clear intervals
-    const clearIntervals = useCallback(() => {
-        if (pollIntervalRef.current) {
-            clearInterval(pollIntervalRef.current);
-            pollIntervalRef.current = null;
-        }
-        if (healthCheckIntervalRef.current) {
-            clearInterval(healthCheckIntervalRef.current);
-            healthCheckIntervalRef.current = null;
-        }
-    }, []);
-
-    // FIXED: Separate function to start polling
-    const startPolling = useCallback(() => {
-        clearIntervals();
-
-        if (!serverReachable) {
-            addDebugLog('Server unreachable, skipping polling');
-            setConnectionStatus('offline');
-            return;
-        }
-
-        addDebugLog('Starting polling mode (60s intervals)');
-        setConnectionStatus('polling');
-
-        pollIntervalRef.current = setInterval(() => {
-            addDebugLog('Polling for updates...');
-            // Use the current filter from ref to avoid stale closure
-            fetchUsage({ uploadFilter: currentFilterRef.current });
-        }, 60000);
-    }, [serverReachable, addDebugLog, fetchUsage, clearIntervals]);
-
-    // FIXED: Separate function to start health check
-    const startHealthCheck = useCallback(() => {
-        healthCheckIntervalRef.current = setInterval(async () => {
-            const wasReachable = serverReachable;
-            const result = await checkServerByFetchingData({ uploadFilter: currentFilterRef.current });
-
-            if (!wasReachable && result.reachable) {
-                addDebugLog('Server came back online, updating data');
-                setData(result.data);
-                setLastUpdated(new Date());
-                setConnectionStatus('online');
-            } else if (wasReachable && !result.reachable) {
-                addDebugLog('Server went offline');
-                setConnectionStatus('offline');
-            }
-        }, 120000);
-    }, [serverReachable, checkServerByFetchingData, addDebugLog]);
-
-    // FIXED: Simplified useEffect for initial load only
-    useEffect(() => {
-        if (isInitialMount.current) {
-            addDebugLog('Dashboard initializing...');
-            fetchUsage({ uploadFilter: 'all' }).then(() => {
-                if (serverReachable) {
-                    addDebugLog('Initial fetch complete, starting polling...');
-                    startPolling();
-                }
-                startHealthCheck();
-            });
-            isInitialMount.current = false;
-        }
-
-        return () => {
-            clearIntervals();
-        };
-    }, []); // REMOVED uploadFilter from dependencies
-
-    // FIXED: Separate useEffect for handling filter changes after initial load
-    useEffect(() => {
-        if (!isInitialMount.current && serverReachable) {
-            addDebugLog(`Filter changed to: ${uploadFilter}, restarting polling`);
-            startPolling();
-        }
-    }, [uploadFilter, serverReachable, startPolling, addDebugLog]);
-
-    // FIXED: Simplified filter change handler
-    const handleUploadFilterChange = useCallback((newFilter) => {
-        console.log('Filter change requested:', newFilter);
-        setUploadFilter(newFilter);
+  // Fetch dashboard data
+  const fetchDashboardData = useCallback(async (isRefresh = false) => {
+    try {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
         setLoading(true);
-        
-        // Fetch immediately with new filter
-        fetchUsage({ uploadFilter: newFilter });
-    }, [fetchUsage]);
+      }
 
-    const handleRefresh = useCallback(async () => {
-        addDebugLog('Manual refresh triggered');
-        setLoading(true);
-        setError(null);
-        setRetryCount(prev => prev + 1);
-        await fetchUsage({ uploadFilter: currentFilterRef.current });
-    }, [addDebugLog, fetchUsage]);
-
-    // Rest of your component remains the same...
-    if (loading && !data) {
-        return (
-            <div className="p-4 flex flex-col items-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mb-2"></div>
-                <p>Loading usage data...</p>
-                <p className="text-sm text-gray-500 mt-2">
-                    {serverReachable === false ? 'Server unreachable - will use offline mode' : 'Checking server connection...'}
-                </p>
-
-                <div className="mt-4 p-4 bg-gray-100 rounded-lg w-full max-w-2xl">
-                    <h3 className="font-bold mb-2">Debug Information:</h3>
-                    <div className="text-xs space-y-1 max-h-40 overflow-y-auto">
-                        {debugInfo.map((log, index) => (
-                            <div key={index} className="font-mono">{log}</div>
-                        ))}
-                    </div>
-                    <button
-                        onClick={handleRefresh}
-                        className="mt-2 px-3 py-1 bg-blue-500 text-white text-sm rounded"
-                    >
-                        Test Server Connection
-                    </button>
-                </div>
-            </div>
-        );
+      const response = await fetch(`/api/usage?uploadFilter=${uploadFilter}&limit=${limit}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      setDashboardData(data);
+      setError(null);
+    } catch (err) {
+      setError(err.message);
+      console.error('Error fetching dashboard data:', err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
+  }, [uploadFilter, limit]);
 
-    if (error && !data) {
-        return (
-            <div className="p-4 text-center">
-                <p className="text-red-500 mb-4">Error: {error}</p>
-                {retryCount > 0 && (
-                    <p className="text-sm text-gray-500 mb-4">Retry attempts: {retryCount}</p>
-                )}
+  // Update URL params
+  const updateFilter = useCallback((key, value) => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set(key, value);
+    setSearchParams(newParams);
+  }, [searchParams, setSearchParams]);
 
-                <div className="mb-4 p-4 bg-gray-100 rounded-lg">
-                    <h3 className="font-bold mb-2">Debug Information:</h3>
-                    <div className="text-xs space-y-1 max-h-40 overflow-y-auto text-left">
-                        {debugInfo.map((log, index) => (
-                            <div key={index} className="font-mono">{log}</div>
-                        ))}
-                    </div>
-                </div>
+  // Fetch data on component mount and when URL params change
+  useEffect(() => {
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
-                <div className="space-x-2">
-                    <button
-                        onClick={handleRefresh}
-                        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
-                    >
-                        Retry ({retryCount > 0 ? `${retryCount} attempts` : 'Try Again'})
-                    </button>
-                </div>
-            </div>
-        );
+  // Auto-refresh every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchDashboardData(true);
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [fetchDashboardData]);
+
+  // Memoized chart data
+  const chartData = useMemo(() => {
+    if (!dashboardData) return null;
+
+    const { metrics } = dashboardData;
+    const successfulUploads = metrics.totalUploads - metrics.failedUploads;
+    const successfulQueries = metrics.totalQueries - metrics.failedQueries;
+    
+    return {
+      uploadSuccess: [
+        { name: 'Successful', value: successfulUploads, color: '#10B981' },
+        { name: 'Failed', value: metrics.failedUploads, color: '#EF4444' }
+      ],
+      querySuccess: [
+        { name: 'Successful', value: successfulQueries, color: '#3B82F6' },
+        { name: 'Failed', value: metrics.failedQueries, color: '#F59E0B' }
+      ],
+      overview: [
+        { name: 'Total Uploads', value: metrics.totalUploads },
+        { name: 'Failed Uploads', value: metrics.failedUploads },
+        { name: 'Total Queries', value: metrics.totalQueries },
+        { name: 'Failed Queries', value: metrics.failedQueries }
+      ]
+    };
+  }, [dashboardData]);
+
+  // Helper functions
+  const formatDate = useCallback((dateString) => {
+    return new Date(dateString).toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }, []);
+
+  const formatFileSize = useCallback((bytes) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }, []);
+
+  const getBrowserInfo = useCallback((userAgent) => {
+    if (!userAgent) return { browser: 'Unknown', device: 'desktop' };
+    
+    let browser = 'Unknown';
+    let device = 'desktop';
+    
+    if (userAgent.includes('Chrome')) browser = 'Chrome';
+    else if (userAgent.includes('Firefox')) browser = 'Firefox';
+    else if (userAgent.includes('Safari') && !userAgent.includes('Chrome')) browser = 'Safari';
+    else if (userAgent.includes('Edge')) browser = 'Edge';
+    
+    if (userAgent.includes('Mobile') || userAgent.includes('iPhone')) device = 'mobile';
+    else if (userAgent.includes('iPad')) device = 'tablet';
+    
+    return { browser, device };
+  }, []);
+
+  const getDeviceIcon = useCallback((device) => {
+    switch (device) {
+      case 'mobile': return '📱';
+      case 'tablet': return '📱';
+      default: return '💻';
     }
+  }, []);
 
-    if (!data) return null;
-
-    // Data destructuring happens AFTER all early returns and hooks
-    const { metrics, recentUploads, recentQueries, recentIPs } = data;
-
-    // Rest of your JSX remains exactly the same...
-    const uploadsData = [
-        { name: 'Uploads', Success: metrics.totalUploads - metrics.failedUploads, Failed: metrics.failedUploads }
-    ];
-
-    const queriesData = [
-        { name: 'Queries', Success: metrics.totalQueries - metrics.failedQueries, Failed: metrics.failedQueries }
-    ];
-
-    const badge = (success) => (
-        <span className={`px-2 py-1 rounded-full text-xs font-mono ${success ? 'bg-green-200 text-green-800' : 'bg-red-200 text-red-800'}`}>
-            {success ? '✅' : '❌'}
-        </span>
-    );
-
-    const cardStyle = 'bg-white dark:bg-gray-800 rounded-lg shadow p-4 hover:shadow-lg transition-shadow';
-
-    const getConnectionStatusColor = () => {
-        switch (connectionStatus) {
-            case 'polling': return 'text-blue-600';
-            case 'offline': return 'text-gray-600';
-            case 'online': return 'text-green-600';
-            case 'checking': return 'text-yellow-600';
-            default: return 'text-gray-600';
-        }
-    };
-
-    const getConnectionStatusText = () => {
-        switch (connectionStatus) {
-            case 'polling': return 'Polling (60s)';
-            case 'offline': return 'Offline Mode';
-            case 'online': return 'Online';
-            case 'checking': return 'Checking...';
-            default: return 'Unknown';
-        }
-    };
-
+  if (loading && !dashboardData) {
     return (
-        <div className={`p-6 space-y-6 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
-            {/* All your existing JSX remains the same */}
-            {/* Header */}
-            <div className="flex justify-between items-center mb-4">
-                <h1 className="text-2xl font-bold">Usage Dashboard</h1>
-                <div className="flex items-center gap-4">
-                    {/* Server Status */}
-                    {serverReachable === false && (
-                        <div className="flex items-center gap-2 text-orange-600">
-                            <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                            <span className="text-sm font-medium">Server Offline</span>
-                        </div>
-                    )}
-
-                    {/* Connection Status */}
-                    <div className={`flex items-center gap-2 ${getConnectionStatusColor()}`}>
-                        <div className={`w-2 h-2 rounded-full ${connectionStatus === 'online' ? 'bg-green-500' :
-                                connectionStatus === 'checking' ? 'bg-yellow-500 animate-pulse' :
-                                    connectionStatus === 'polling' ? 'bg-blue-500 animate-pulse' :
-                                        connectionStatus === 'offline' ? 'bg-gray-500' :
-                                            'bg-red-500'
-                            }`}></div>
-                        <span className="text-sm font-medium">{getConnectionStatusText()}</span>
-                    </div>
-
-                    {/* Manual Refresh Button */}
-                    <button
-                        onClick={handleRefresh}
-                        disabled={loading}
-                        className="px-3 py-1 text-sm bg-blue-500 text-white rounded hover:bg-blue-600 disabled:opacity-50 transition-colors"
-                    >
-                        {loading ? 'Refreshing...' : 'Refresh'}
-                    </button>
-
-                    {lastUpdated && (
-                        <p className="text-sm text-gray-500 dark:text-gray-300">
-                            Updated: {lastUpdated.toLocaleTimeString()}
-                        </p>
-                    )}
-                </div>
-            </div>
-
-            {/* Rest of your JSX... */}
-            {/* I'll include the rest for completeness but it's identical to your current code */}
-            
-            {/* Offline Mode Banner */}
-            {connectionStatus === 'offline' && (
-                <div className="bg-orange-100 border-l-4 border-orange-500 text-orange-700 p-4 mb-4">
-                    <p className="font-bold">Offline Mode</p>
-                    <p>Server is unreachable. Showing empty dashboard. Data will update when server comes back online.</p>
-                </div>
-            )}
-
-            {/* Debug Panel (collapsible) */}
-            <details className="mb-4">
-                <summary className="cursor-pointer text-sm text-gray-600 hover:text-gray-800">
-                    Debug Information ({debugInfo.length} logs) {retryCount > 0 && `- ${retryCount} retries`}
-                </summary>
-                <div className="mt-2 p-3 bg-gray-50 rounded text-xs space-y-1 max-h-32 overflow-y-auto">
-                    {debugInfo.map((log, index) => (
-                        <div key={index} className="font-mono">{log}</div>
-                    ))}
-                </div>
-            </details>
-
-            {/* Error Banner */}
-            {error && data && (
-                <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4">
-                    <p className="font-bold">Warning</p>
-                    <p>{error}</p>
-                </div>
-            )}
-
-            {/* Metrics Cards */}
-            <div className="flex flex-wrap gap-4">
-                <div className={`${cardStyle} flex-1 border-l-4 border-green-500`}>
-                    <p className="text-sm font-medium">Total Uploads</p>
-                    <p className="text-2xl font-bold">{metrics.totalUploads}</p>
-                </div>
-                <div className={`${cardStyle} flex-1 border-l-4 border-red-500`}>
-                    <p className="text-sm font-medium">Failed Uploads</p>
-                    <p className="text-2xl font-bold">{metrics.failedUploads}</p>
-                </div>
-                <div className={`${cardStyle} flex-1 border-l-4 border-green-500`}>
-                    <p className="text-sm font-medium">Total Queries</p>
-                    <p className="text-2xl font-bold">{metrics.totalQueries}</p>
-                </div>
-                <div className={`${cardStyle} flex-1 border-l-4 border-red-500`}>
-                    <p className="text-sm font-medium">Failed Queries</p>
-                    <p className="text-2xl font-bold">{metrics.failedQueries}</p>
-                </div>
-            </div>
-
-            {/* Charts */}
-            <div className="flex flex-wrap gap-6">
-                <div className={`${cardStyle} flex-1 min-w-[300px]`}>
-                    <p className="text-lg font-semibold mb-2">Uploads (Success vs Failed)</p>
-                    <ResponsiveContainer width="100%" height={250}>
-                        <BarChart data={uploadsData}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" />
-                            <YAxis />
-                            <Tooltip />
-                            <Legend />
-                            <Bar dataKey="Success" fill="#4ade80" />
-                            <Bar dataKey="Failed" fill="#f87171" />
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-                <div className={`${cardStyle} flex-1 min-w-[300px]`}>
-                    <p className="text-lg font-semibold mb-2">Queries (Success vs Failed)</p>
-                    <ResponsiveContainer width="100%" height={250}>
-                        <BarChart data={queriesData}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="name" />
-                            <YAxis />
-                            <Legend />
-                            <Bar dataKey="Success" fill="#4ade80" />
-                            <Bar dataKey="Failed" fill="#f87171" />
-                        </BarChart>
-                    </ResponsiveContainer>
-                </div>
-            </div>
-
-            {/* Tab Navigation */}
-            <div className="flex space-x-1 bg-gray-100 dark:bg-gray-700 p-1 rounded-lg">
-                <button
-                    onClick={() => setActiveTab('uploads')}
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'uploads'
-                            ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow'
-                            : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                        }`}
-                >
-                    Uploads ({displayUploads?.length || 0})
-                </button>
-                <button
-                    onClick={() => setActiveTab('queries')}
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'queries'
-                            ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow'
-                            : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                        }`}
-                >
-                    Queries ({recentQueries?.length || 0})
-                </button>
-                <button
-                    onClick={() => setActiveTab('ips')}
-                    className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${activeTab === 'ips'
-                            ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow'
-                            : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-                        }`}
-                >
-                    IPs/Agents ({recentIPs?.length || 0})
-                </button>
-            </div>
-
-            {/* Tab Content */}
-            {activeTab === 'uploads' && (
-                <div className="space-y-4">
-                    {/* Upload Filter */}
-                    <div className="flex items-center gap-4">
-                        <p className="text-lg font-semibold">Recent Uploads</p>
-                        <div className="flex gap-2">
-                            <button
-                                onClick={() => handleUploadFilterChange('all')}
-                                className={`px-3 py-1 text-sm rounded transition-colors ${uploadFilter === 'all'
-                                        ? 'bg-blue-500 text-white'
-                                        : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
-                                    }`}
-                            >
-                                All
-                            </button>
-                            <button
-                                onClick={() => handleUploadFilterChange('success')}
-                                className={`px-3 py-1 text-sm rounded transition-colors ${uploadFilter === 'success'
-                                        ? 'bg-green-500 text-white'
-                                        : 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-500'
-                                    }`}
-                            >
-                                Success Only
-                            </button>
-                            <button
-                                className={`px-4 py-2 rounded-lg transition-colors ${uploadFilter === 'failed'
-                                        ? 'bg-red-500 text-white'
-                                        : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                                    }`}
-                                onClick={() => handleUploadFilterChange('failed')}
-                            >
-                                Failed Only
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Upload List */}
-                    <div className="grid gap-4">
-                        {displayUploads && displayUploads.length > 0 ? displayUploads.map(u => (
-                            <div key={u.chunkId + u.timestamp} className={cardStyle}>
-                                <div className="flex justify-between items-center mb-1">
-                                    <span className="font-mono text-sm truncate">{u.chunkId}</span>
-                                    {badge(u.success)}
-                                </div>
-                                <div className="text-xs text-gray-500 dark:text-gray-300">Size: {u.sizeMB || u.size} MB | RequestID: {u.requestId}</div>
-                                <div className="text-xs text-gray-500 dark:text-gray-300">IP: {u.ipAddress}</div>
-                                <div className="text-xs text-gray-500 dark:text-gray-300 truncate">UA: {u.userAgent}</div>
-                                <div className="text-xs text-gray-400 mt-1">{new Date(u.timestamp || u.createdAt).toLocaleString()}</div>
-                            </div>
-                        )) : (
-                            <p className="text-gray-500">
-                                {connectionStatus === 'offline' ? 'No data available (offline mode)' :
-                                    uploadFilter === 'failed' ? 'No failed uploads found' :
-                                        uploadFilter === 'success' ? 'No successful uploads found' :
-                                            'No recent uploads'}
-                            </p>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {activeTab === 'queries' && (
-                <div className="space-y-4">
-                    <p className="text-lg font-semibold">Recent Queries</p>
-                    <div className="grid gap-4">
-                        {recentQueries && recentQueries.length > 0 ? recentQueries.map(q => (
-                            <div key={q.segmentId + q.timestamp} className={cardStyle}>
-                                <div className="flex justify-between items-center mb-1">
-                                    <span className="font-mono text-sm truncate">UserID: {q.userId}</span>
-                                    {badge(q.success)}
-                                </div>
-                                <div className="text-xs text-gray-500 dark:text-gray-300 truncate">SegmentID: {q.segmentId}</div>
-                                <div className="text-xs text-gray-400 mt-1">{new Date(q.timestamp || q.createdAt).toLocaleString()}</div>
-                            </div>
-                        )) : (
-                            <p className="text-gray-500">
-                                {connectionStatus === 'offline' ? 'No data available (offline mode)' : 'No recent queries'}
-                            </p>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {activeTab === 'ips' && (
-                <div className="space-y-4">
-                    <p className="text-lg font-semibold">Recent IPs / User Agents (Most Active First)</p>
-                    <div className="grid gap-4">
-                        {recentIPs && recentIPs.length > 0 ? recentIPs.map((ip, index) => (
-                            <div key={`${ip.ipAddress}-${ip.userAgent}-${index}`} className={cardStyle}>
-                                <div className="flex justify-between items-center mb-1">
-                                    <div className="font-mono text-sm">{ip.ipAddress}</div>
-                                    <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-bold">
-                                        {ip.count} records
-                                    </span>
-                                </div>
-                                <div className="text-xs text-gray-500 dark:text-gray-300 truncate">{ip.userAgent}</div>
-                                <div className="text-xs text-gray-400 mt-1">
-                                    Last seen: {new Date(ip.lastSeen || ip.createdAt).toLocaleString()}
-                                </div>
-                            </div>
-                        )) : (
-                            <p className="text-gray-500">
-                                {connectionStatus === 'offline' ? 'No data available (offline mode)' : 'No recent IP data'}
-                            </p>
-                        )}
-                    </div>
-                </div>
-            )}
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading dashboard...</p>
         </div>
+      </div>
     );
-}
+  }
+
+  if (error && !dashboardData) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center bg-white p-8 rounded-lg shadow-lg">
+          <div className="text-red-500 text-6xl mb-4">⚠️</div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Error Loading Dashboard</h2>
+          <p className="text-gray-600 mb-4">{error}</p>
+          <button
+            onClick={() => fetchDashboardData()}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg transition-colors"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!dashboardData) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-gray-500">No data available</div>
+      </div>
+    );
+  }
+
+  const { metrics, recentUploads, recentQueries, recentIPs } = dashboardData;
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <header className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-6">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Usage Dashboard</h1>
+              <p className="text-gray-600 mt-1">Real-time analytics and monitoring</p>
+            </div>
+            <div className="flex items-center space-x-4">
+              <div className="text-sm text-gray-500">
+                Last updated: {new Date().toLocaleTimeString()}
+              </div>
+              <button
+                onClick={() => fetchDashboardData(true)}
+                disabled={refreshing}
+                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors"
+              >
+                <span className={refreshing ? 'animate-spin' : ''}>🔄</span>
+                <span>{refreshing ? 'Refreshing...' : 'Refresh'}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Filters */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Filters</h2>
+          <div className="flex flex-wrap gap-6">
+            <div className="flex flex-col">
+              <label className="text-sm font-medium text-gray-700 mb-2">Upload Filter</label>
+              <select
+                value={uploadFilter}
+                onChange={(e) => updateFilter('uploadFilter', e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-2 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="all">All Uploads</option>
+                <option value="success">Successful Only</option>
+                <option value="failed">Failed Only</option>
+              </select>
+            </div>
+            <div className="flex flex-col">
+              <label className="text-sm font-medium text-gray-700 mb-2">Limit</label>
+              <select
+                value={limit}
+                onChange={(e) => updateFilter('limit', e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-2 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="25">25 Records</option>
+                <option value="50">50 Records</option>
+                <option value="100">100 Records</option>
+                <option value="200">200 Records</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Metrics Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <span className="text-blue-600">📤</span>
+                </div>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Total Uploads</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {metrics.totalUploads.toLocaleString()}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
+                  <span className="text-red-600">❌</span>
+                </div>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Failed Uploads</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {metrics.failedUploads.toLocaleString()}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                  <span className="text-green-600">🔍</span>
+                </div>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Total Queries</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {metrics.totalQueries.toLocaleString()}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center">
+              <div className="flex-shrink-0">
+                <div className="w-8 h-8 bg-yellow-100 rounded-lg flex items-center justify-center">
+                  <span className="text-yellow-600">⚠️</span>
+                </div>
+              </div>
+              <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Failed Queries</p>
+                <p className="text-2xl font-bold text-gray-900">
+                  {metrics.failedQueries.toLocaleString()}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+          {/* Overview Bar Chart */}
+          <div className="lg:col-span-2 bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Overview</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={chartData?.overview}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
+                <XAxis dataKey="name" stroke="#6B7280" fontSize={12} />
+                <YAxis stroke="#6B7280" fontSize={12} />
+                <Tooltip 
+                  contentStyle={{
+                    backgroundColor: 'white',
+                    border: '1px solid #E5E7EB',
+                    borderRadius: '8px'
+                  }}
+                />
+                <Bar dataKey="value" fill="#3B82F6" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Upload Success Rate */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Upload Success Rate</h3>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={chartData?.uploadSuccess}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={60}
+                  outerRadius={100}
+                  paddingAngle={5}
+                  dataKey="value"
+                >
+                  {chartData?.uploadSuccess.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Data Tables */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8">
+          {/* Recent Uploads */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Recent Uploads ({recentUploads.length})
+              </h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Size
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Chunks
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Time
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {recentUploads.slice(0, 10).map((upload) => (
+                    <tr key={upload.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          upload.success
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {upload.success ? '✓ Success' : '✗ Failed'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {formatFileSize(upload.size)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {upload.totalChunks}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {formatDate(upload.createdAt)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Recent Queries */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Recent Queries ({recentQueries.length})
+              </h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      User
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Segment
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Time
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {recentQueries.slice(0, 10).map((query) => (
+                    <tr key={query.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          query.success
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {query.success ? '✓ Success' : '✗ Failed'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {query.userId}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono text-xs">
+                        {query.segmentId.substring(0, 20)}...
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {formatDate(query.createdAt)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        {/* IP Activity */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-semibold text-gray-900">
+              Recent IP Activity ({recentIPs.length})
+            </h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    IP Address
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Browser & Device
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Requests
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Last Seen
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {recentIPs.map((ip, index) => {
+                  const browserInfo = getBrowserInfo(ip.userAgent);
+                  return (
+                    <tr key={index} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
+                        {ip.ipAddress}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-500">
+                        <div className="flex items-center space-x-2">
+                          <span>{getDeviceIcon(browserInfo.device)}</span>
+                          <span className="truncate max-w-xs">{browserInfo.browser}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          {ip.count} requests
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {formatDate(ip.lastSeen)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+};
+
+export default UsageDashboard;
