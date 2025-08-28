@@ -21,6 +21,8 @@ const UsageDashboard = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [refreshing, setRefreshing] = useState(false);
+    const [isOnline, setIsOnline] = useState(true);
+
 
     // Get filter values from URL params
     const uploadFilter = searchParams.get('uploadFilter') || 'all';
@@ -30,43 +32,46 @@ const UsageDashboard = () => {
     const API_BASE_URL = 'https://live-server1.com';
 
     // Fetch dashboard data
-    const fetchDashboardData = useCallback(async (isRefresh = false) => {
-        try {
-            if (isRefresh) {
-                setRefreshing(true);
-            } else {
-                setLoading(true);
-            }
-
-            console.log(`Fetching data from: ${API_BASE_URL}/api/usage?uploadFilter=${uploadFilter}&limit=${limit}`);
-
-            const response = await fetch(`${API_BASE_URL}/api/usage?uploadFilter=${uploadFilter}&limit=${limit}`, {
-                method: 'GET',
-                headers: {
-                    'Content-Type': 'application/json',
-                    // Add any additional headers if needed for CORS or authentication
-                },
-                // Add credentials if your API requires authentication
-                // credentials: 'include',
-            });
-
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
-            }
-
-            const data = await response.json();
-            console.log('API Response:', data);
-
-            setDashboardData(data);
-            setError(null);
-        } catch (err) {
-            console.error('Error fetching dashboard data:', err);
-            setError(`Failed to fetch data: ${err.message}`);
-        } finally {
-            setLoading(false);
-            setRefreshing(false);
+const fetchDashboardData = useCallback(async (isRefresh = false) => {
+    try {
+        if (isRefresh) {
+            setRefreshing(true);
+        } else {
+            setLoading(true);
         }
-    }, [uploadFilter, limit, API_BASE_URL]);
+
+        console.log(`Fetching data from: ${API_BASE_URL}/api/usage?uploadFilter=${uploadFilter}&limit=${limit}`);
+
+        const response = await fetch(`${API_BASE_URL}/api/usage?uploadFilter=${uploadFilter}&limit=${limit}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+                // Add any additional headers if needed for CORS or authentication
+            },
+            // Add credentials if your API requires authentication
+            // credentials: 'include',
+        });
+
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        console.log('API Response:', data);
+
+        setDashboardData(data);
+        setError(null);
+        setIsOnline(true); // Set online when API call succeeds
+    } catch (err) {
+        console.error('Error fetching dashboard data:', err);
+        setError(`Failed to fetch data: ${err.message}`);
+        setIsOnline(false); // Set offline when API call fails
+    } finally {
+        setLoading(false);
+        setRefreshing(false);
+    }
+}, [uploadFilter, limit, API_BASE_URL]);
+
 
     // Update URL params
     const updateFilter = useCallback((key, value) => {
