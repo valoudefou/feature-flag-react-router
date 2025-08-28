@@ -99,29 +99,30 @@ const StatusBadge = ({ success, type = 'default' }) => {
 // Metric Card Component
 const MetricCard = ({ title, value, icon: Icon, trend, color = 'blue' }) => {
     const colorVariants = {
-        blue: 'from-blue-500 to-blue-600',
-        green: 'from-emerald-500 to-emerald-600',
-        red: 'from-red-500 to-red-600',
-        yellow: 'from-amber-500 to-amber-600',
-        purple: 'from-purple-500 to-purple-600'
+        blue: 'text-blue-600',
+        green: 'text-emerald-600',
+        red: 'text-red-600',
+        yellow: 'text-amber-600',
+        purple: 'text-purple-600'
     };
 
     return (
-      <div className={`bg-gradient-to-br ${colorVariants[color]} rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1`}>
-            <div className="flex flex-col items-center text-center">
-                <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mb-4 backdrop-blur-sm">
+           <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 group">
+            <div className="flex items-center justify-between mb-6">
+                <div className={`${colorVariants[color]} group-hover:scale-110 transition-transform duration-300`}>
                     <Icon />
                 </div>
-                <p className="text-white/80 text-sm font-medium mb-2">{title}</p>
-                <p className="text-3xl font-bold mb-2">
+                {trend && (
+                    <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
+                        {trend}
+                    </span>
+                )}
+            </div>
+            <div className="space-y-2">
+                <p className="text-4xl font-black text-gray-900 leading-none">
                     {typeof value === 'number' ? value.toLocaleString() : value}
                 </p>
-                {trend && (
-                    <div className="flex items-center space-x-1 text-white/90">
-                        <Icons.TrendingUp />
-                        <span className="text-sm font-medium">{trend}</span>
-                    </div>
-                )}
+                <p className="text-gray-500 text-sm font-medium uppercase tracking-wide">{title}</p>
             </div>
         </div>
     );
