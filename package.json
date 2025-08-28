@@ -2,6 +2,10 @@
   "name": "my-auth-app",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": "20.x",
+    "npm": "11.x"
+  },
   "dependencies": {
     "@flagship.io/js-sdk": "^5.1.5",
     "@testing-library/dom": "^10.4.0",
@@ -12,14 +16,13 @@
     "ajv-keywords": "3.5.2",
     "lucide-react": "^0.525.0",
     "node-fetch": "^3.3.2",
-    "react": "^19.1.1",
-    "react-dom": "^19.1.1",
-    "react-router-dom": "^7.7.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "react-router-dom": "^6.14.0",
     "recharts": "^3.1.2",
     "tailwindcss": "^3.4.17",
     "web-vitals": "^2.1.4"
   },
-  "dev": "react-scripts start",
   "scripts": {
     "start": "react-scripts start",
     "dev": "react-scripts start",
@@ -28,29 +31,18 @@
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
-    "extends": [
-      "react-app",
-      "react-app/jest"
-    ]
+    "extends": ["react-app", "react-app/jest"]
   },
   "browserslist": {
-    "production": [
-      ">0.2%",
-      "not dead",
-      "not op_mini all"
-    ],
-    "development": [
-      "last 1 chrome version",
-      "last 1 firefox version",
-      "last 1 safari version"
-    ]
+    "production": [">0.2%", "not dead", "not op_mini all"],
+    "development": ["last 1 chrome version", "last 1 firefox version", "last 1 safari version"]
   },
   "devDependencies": {
-    "@types/react": "^19.1.8",
-    "@types/react-dom": "^19.1.6",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
     "autoprefixer": "^10.4.21",
     "postcss": "^8.5.6",
-    "react-scripts": "^0.0.0",
+    "react-scripts": "^5.0.1",
     "typescript": "^4.9.5"
   }
 }
