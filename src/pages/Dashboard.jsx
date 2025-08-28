@@ -1,7 +1,7 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from "../auth/AuthProvider";
 import { HitType, EventCategory, Flagship } from "@flagship.io/js-sdk";
-import React, { useEffect, useContext } from 'react';
+import { useEffect, useContext } from 'react';
 import { ThemeContext } from '../App'; // <-- import ThemeContext
 import { initializeFlagship } from '../utils/flagshipClient';
 
@@ -15,11 +15,11 @@ export default function Dashboard() {
       ? 'bg-gray-900 text-white dark:bg-gray-200 dark:text-black'
       : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700';
 
-  const navigationItems = [
-    { path: 'profile', label: 'Profile', icon: '👤' },
-    { path: 'settings', label: 'Settings', icon: '⚙️' },
-    { path: 'usage', label: 'Usage', icon: '📊' }, // <-- add this
-  ];
+const navigationItems = [
+  { path: 'profile', label: 'Profile', icon: '👤' },
+  { path: 'settings', label: 'Settings', icon: '⚙️' },
+  { path: 'usage', label: 'Usage', icon: '📊' }, // <-- add this
+];
 
   const stats = [
     { label: 'Projects', value: '12', icon: '📁' },
@@ -99,7 +99,7 @@ export default function Dashboard() {
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700'
                     }`}
                 >
-                  <span className="mr-3">🔍</span>
+                  <span className="mr-3">📊</span>
                   Overview
                 </Link>
                 {navigationItems.map((item) => (
