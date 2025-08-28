@@ -99,29 +99,25 @@ const StatusBadge = ({ success, type = 'default' }) => {
 // Metric Card Component
 const MetricCard = ({ title, value, icon: Icon, trend, color = 'blue' }) => {
     const colorVariants = {
-        blue: 'bg-blue-50 text-blue-600',
-        green: 'bg-emerald-50 text-emerald-600',
-        red: 'bg-red-50 text-red-600',
-        yellow: 'bg-amber-50 text-amber-600',
-        purple: 'bg-purple-50 text-purple-600'
+        blue: 'from-blue-500 to-blue-600',
+        green: 'from-emerald-500 to-emerald-600',
+        red: 'from-red-500 to-red-600',
+        yellow: 'from-amber-500 to-amber-600',
+        purple: 'from-purple-500 to-purple-600'
     };
 
     return (
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-200">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${colorVariants[color]}`}>
-                        <Icon />
-                    </div>
-                    <div>
-                        <p className="text-sm font-medium text-gray-600 mb-1">{title}</p>
-                        <p className="text-2xl font-bold text-gray-900">
-                            {typeof value === 'number' ? value.toLocaleString() : value}
-                        </p>
-                    </div>
+      <div className={`bg-gradient-to-br ${colorVariants[color]} rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1`}>
+            <div className="flex flex-col items-center text-center">
+                <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mb-4 backdrop-blur-sm">
+                    <Icon />
                 </div>
+                <p className="text-white/80 text-sm font-medium mb-2">{title}</p>
+                <p className="text-3xl font-bold mb-2">
+                    {typeof value === 'number' ? value.toLocaleString() : value}
+                </p>
                 {trend && (
-                    <div className="flex items-center space-x-1 text-emerald-600">
+                    <div className="flex items-center space-x-1 text-white/90">
                         <Icons.TrendingUp />
                         <span className="text-sm font-medium">{trend}</span>
                     </div>
@@ -638,7 +634,6 @@ const UsageDashboard = () => {
                 {/* Footer with additional info */}
                 <div className="mt-8 text-center text-sm text-gray-500">
                     <p>Dashboard automatically refreshes every 30 seconds</p>
-                    <p className="mt-1">Connected to: {API_BASE_URL}</p>
                 </div>
             </main>
         </div>
