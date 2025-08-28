@@ -107,7 +107,7 @@ const MetricCard = ({ title, value, icon: Icon, trend, color = 'blue' }) => {
     };
 
     return (
-        <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 group">
+           <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 group">
             <div className="flex items-center justify-between mb-6">
                 <div className={`${colorVariants[color]} group-hover:scale-110 transition-transform duration-300`}>
                     <Icon />
@@ -285,8 +285,8 @@ const UsageDashboard = () => {
     // Loading state
     if (loading && !dashboardData) {
         return (
-            <div className="min-h-screen">
-                <div className="max-w-7xl mx-auto px-6 lg:px-8 py-6">
+            <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                     <div className="mb-8">
                         <div className="h-8 bg-gray-200 rounded w-64 mb-2"></div>
                         <div className="h-4 bg-gray-200 rounded w-96"></div>
@@ -297,11 +297,10 @@ const UsageDashboard = () => {
         );
     }
 
-
     // Error state
     if (error && !dashboardData) {
         return (
-            <div className="min-h-screen flex items-center justify-center">
+            <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
                 <div className="text-center bg-white p-8 rounded-2xl shadow-xl max-w-md border border-gray-100">
                     <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
                         <Icons.Error />
@@ -322,7 +321,7 @@ const UsageDashboard = () => {
 
     if (!dashboardData) {
         return (
-            <div className="min-h-screen flex items-center justify-center">
+            <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
                 <div className="text-gray-500">No data available</div>
             </div>
         );
@@ -331,7 +330,7 @@ const UsageDashboard = () => {
     const { metrics, recentUploads, recentQueries, recentIPs } = dashboardData;
 
     return (
-        <div className="min-h-screen">
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
             {/* Modern Header */}
             <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 sticky top-0 z-10">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -632,7 +631,6 @@ const UsageDashboard = () => {
                         </table>
                     </div>
                 </div>
-
             </main>
         </div>
     );
