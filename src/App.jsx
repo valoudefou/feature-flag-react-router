@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { initializeFlagship } from './utils/flagshipClient';
 import { AuthProvider, useAuth } from './auth/AuthProvider';
@@ -25,12 +25,29 @@ function AppWithThemeAndFlags() {
     return stored === 'dark' || stored === 'light' ? stored : 'light';
   });
 
-  const [showLogs, setShowLogs] = useState(true);
-  const [logHeight, setLogHeight] = useState(300); // Default height in pixels
+  const [showLogs, setShowLogs] = useState(() => {
+    const v = localStorage.getItem('showLogs');
+    return v === null ? true : v === 'true';
+  });
+
+  const [logHeight, setLogHeight] = useState(() => {
+    const v = parseInt(localStorage.getItem('logHeight') ?? '', 10);
+    return Number.isFinite(v) ? v : 300;
+  });
+
   const [isDragging, setIsDragging] = useState(false);
   const dragStartY = useRef(0);
   const initialHeight = useRef(0);
   const { user } = useAuth();
+
+  useEffect(() => {
+    localStorage.setItem('showLogs', String(showLogs));
+  }, [showLogs]);
+
+  useEffect(() => {
+    localStorage.setItem('logHeight', String(logHeight));
+  }, [logHeight]);
+
 
   // Apply theme
   useEffect(() => {
@@ -71,28 +88,27 @@ function AppWithThemeAndFlags() {
   }, [user]);
 
   // Keyboard shortcut for just pressing "L"
+  // Keyboard shortcut for "L" (toggle) and "Shift+L" (reset)
   useEffect(() => {
     const handleKeydown = (e) => {
       // Avoid triggering in input, textarea, or contenteditable
-      const tag = e.target.tagName.toLowerCase();
+      const tag = e.target.tagName?.toLowerCase?.() ?? '';
       const isEditable = e.target.isContentEditable;
       if (tag === 'input' || tag === 'textarea' || isEditable) return;
+      if (e.repeat) return;
 
-      // Toggle logs on pressing "L" or "l"
-      if (e.key.toLowerCase() === 'l') {
-        setShowLogs((prev) => {
-          const next = !prev;
-          localStorage.setItem('showLogs', next); // ✅ persist
-          return next;
-        });
-      }
+      const key = e.key?.toLowerCase?.();
+      if (key !== 'l') return;
 
-      // Reset logs with Shift+L (optional)
-      if (e.key.toLowerCase() === 'l' && e.shiftKey) {
+      e.preventDefault();
+
+      if (e.shiftKey) {
+        // Reset to defaults
         setShowLogs(true);
         setLogHeight(300);
-        localStorage.setItem('showLogs', true);
-        localStorage.setItem('logHeight', 300);
+      } else {
+        // Toggle logs
+        setShowLogs((prev) => !prev);
       }
     };
 
@@ -101,6 +117,7 @@ function AppWithThemeAndFlags() {
       window.removeEventListener('keydown', handleKeydown);
     };
   }, []);
+
 
 
   // Handle drag functionality
