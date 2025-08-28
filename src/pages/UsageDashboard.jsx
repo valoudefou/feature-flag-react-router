@@ -496,60 +496,68 @@ const UsageDashboard = () => {
           </div>
         </div>
 
-        {/* IP Activity */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-semibold text-gray-900">
-              Recent IP Activity ({recentIPs.length})
-            </h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    IP Address
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Browser & Device
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Requests
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Last Seen
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {recentIPs.map((ip, index) => {
-                  const browserInfo = getBrowserInfo(ip.userAgent);
-                  return (
-                    <tr key={index} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
-                        {ip.ipAddress}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-500">
-                        <div className="flex items-center space-x-2">
-                          <span>{getDeviceIcon(browserInfo.device)}</span>
-                          <span className="truncate max-w-xs">{browserInfo.browser}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          {ip.count} requests
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {formatDate(ip.lastSeen)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
+{/* IP Activity */}
+<div className="bg-white rounded-lg shadow-sm border border-gray-200">
+  <div className="px-6 py-4 border-b border-gray-200">
+    <h3 className="text-lg font-semibold text-gray-900">
+      Recent IP Activity ({recentIPs.length})
+    </h3>
+  </div>
+  <div className="overflow-x-auto">
+    <table className="min-w-full divide-y divide-gray-200">
+      <thead className="bg-gray-50">
+        <tr>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            IP Address
+          </th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Browser & Device
+          </th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            User Agent (Full)
+          </th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Requests
+          </th>
+          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+            Last Seen
+          </th>
+        </tr>
+      </thead>
+      <tbody className="bg-white divide-y divide-gray-200">
+        {recentIPs.map((ip, index) => {
+          const browserInfo = getBrowserInfo(ip.userAgent);
+          return (
+            <tr key={index} className="hover:bg-gray-50">
+              <td className="px-6 py-4 whitespace-nowrap text-sm font-mono text-gray-900">
+                {ip.ipAddress}
+              </td>
+              <td className="px-6 py-4 text-sm text-gray-500">
+                <div className="flex items-center space-x-2">
+                  <span>{getDeviceIcon(browserInfo.device)}</span>
+                  <span className="truncate max-w-xs">{browserInfo.browser}</span>
+                </div>
+              </td>
+              {/* FULL USER AGENT DISPLAY */}
+              <td className="px-6 py-4 text-sm text-gray-500 font-mono max-w-md truncate" title={ip.userAgent}>
+                {ip.userAgent}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap">
+                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                  {ip.count} requests
+                </span>
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                {formatDate(ip.lastSeen)}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  </div>
+</div>
+
       </main>
     </div>
   );
