@@ -99,7 +99,7 @@ const navigationItems = [
                     : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-white dark:hover:bg-gray-700'
                     }`}
                 >
-                  <span className="mr-3"></span>
+                  <span className="mr-3">🔍</span>
                   Overview
                 </Link>
                 {navigationItems.map((item) => (
