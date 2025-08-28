@@ -104,9 +104,13 @@ const StatusBadge = ({ success, type = 'default', errorMessage }) => {
 
     {/* Tooltip */}
     {!success && errorMessage && hovered && (
-        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-1.5 text-xs text-white bg-gradient-to-br from-red-500 to-red-600 rounded-lg shadow-xl whitespace-nowrap z-10
-                        opacity-0 scale-95 animate-tooltipIn origin-bottom">
-            {errorMessage}
+        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 z-10 flex flex-col items-center">
+            {/* Tooltip Box */}
+            <div className="px-3 py-1.5 text-xs text-white bg-gray-900 rounded-md shadow-md whitespace-nowrap">
+                {errorMessage}
+            </div>
+            {/* Floating Arrow */}
+            <div className="w-2 h-2 bg-gray-900 transform rotate-45 -mt-1.5"></div>
         </div>
     )}
 </span>
