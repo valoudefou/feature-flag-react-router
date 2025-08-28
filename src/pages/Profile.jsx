@@ -1,4 +1,4 @@
-import { useState, useContext } from 'react';
+import React, { useState, useContext } from 'react';
 import { useAuth } from '../auth/AuthProvider';
 import { ThemeContext } from '../App';
 

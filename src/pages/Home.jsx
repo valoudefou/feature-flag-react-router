@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthProvider';
-import { useEffect, useState, useContext, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useContext, useCallback, useRef } from 'react';
 import { initializeFlagship } from '../utils/flagshipClient';
 import { ThemeContext } from '../App';
 

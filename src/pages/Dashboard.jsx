@@ -1,7 +1,7 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from "../auth/AuthProvider";
 import { HitType, EventCategory, Flagship } from "@flagship.io/js-sdk";
-import { useEffect, useContext } from 'react';
+import React, { useEffect, useContext } from 'react';
 import { ThemeContext } from '../App'; // <-- import ThemeContext
 import { initializeFlagship } from '../utils/flagshipClient';
 
