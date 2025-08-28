@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, useContext } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { ThemeContext } from '../App';
 import {
     BarChart,
     Bar,
@@ -51,41 +52,45 @@ const Icons = {
     ),
     Globe: () => (
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9a9 9 0 00-9 9m9-9v9m0-9a9 9 0 019 9m-9 9a9 9 0 01-9-9" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9v-9m0-9a9 9 0 00-9 9m9-9v9m0-9a9 9 0 919 9m-9 9a9 9 0 01-9-9" />
         </svg>
     )
 };
 
 // Loading Skeleton Component
-const LoadingSkeleton = () => (
+const LoadingSkeleton = ({ theme }) => (
     <div className="animate-pulse">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
             {[...Array(4)].map((_, i) => (
-                <div key={i} className="bg-white rounded-xl p-6 shadow-sm">
-                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-3"></div>
-                    <div className="h-8 bg-gray-200 rounded w-1/2"></div>
+                <div key={i} className={`${theme === 'dark' ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 shadow-sm`}>
+                    <div className={`h-4 ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'} rounded w-3/4 mb-3`}></div>
+                    <div className={`h-8 ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'} rounded w-1/2`}></div>
                 </div>
             ))}
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {[...Array(2)].map((_, i) => (
-                <div key={i} className="bg-white rounded-xl p-6 shadow-sm">
-                    <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
-                    <div className="h-64 bg-gray-100 rounded"></div>
+                <div key={i} className={`${theme === 'dark' ? 'bg-gray-800' : 'bg-white'} rounded-xl p-6 shadow-sm`}>
+                    <div className={`h-6 ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'} rounded w-1/3 mb-4`}></div>
+                    <div className={`h-64 ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'} rounded`}></div>
                 </div>
             ))}
         </div>
     </div>
 );
 
-// Simplified Status Badge Component without tooltip
-const StatusBadge = ({ success, type = 'default' }) => {
+// Status Badge Component
+const StatusBadge = ({ success, type = 'default', theme }) => {
     const variants = {
-        success: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-        error: 'bg-red-50 text-red-700 border-red-200',
+        success: theme === 'dark'
+            ? 'bg-emerald-900/50 text-emerald-300 border-emerald-700'
+            : 'bg-emerald-50 text-emerald-700 border-emerald-200',
+        error: theme === 'dark'
+            ? 'bg-red-900/50 text-red-300 border-red-700'
+            : 'bg-red-50 text-red-700 border-red-200',
         default: success
-            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-            : 'bg-red-50 text-red-700 border-red-200'
+            ? (theme === 'dark' ? 'bg-emerald-900/50 text-emerald-300 border-emerald-700' : 'bg-emerald-50 text-emerald-700 border-emerald-200')
+            : (theme === 'dark' ? 'bg-red-900/50 text-red-300 border-red-700' : 'bg-red-50 text-red-700 border-red-200')
     };
 
     return (
@@ -99,43 +104,54 @@ const StatusBadge = ({ success, type = 'default' }) => {
 };
 
 // Metric Card Component
-const MetricCard = ({ title, value, icon: Icon, trend, color = 'blue' }) => {
+const MetricCard = ({ title, value, icon: Icon, trend, color = 'blue', theme }) => {
     const colorVariants = {
-        blue: 'text-blue-600',
-        green: 'text-emerald-600',
-        red: 'text-red-600',
-        yellow: 'text-amber-600',
-        purple: 'text-purple-600'
+        blue: theme === 'dark' ? 'text-blue-400' : 'text-blue-600',
+        green: theme === 'dark' ? 'text-emerald-400' : 'text-emerald-600',
+        red: theme === 'dark' ? 'text-red-400' : 'text-red-600',
+        yellow: theme === 'dark' ? 'text-amber-400' : 'text-amber-600',
+        purple: theme === 'dark' ? 'text-purple-400' : 'text-purple-600'
     };
 
+    const cardBg = theme === 'dark'
+        ? 'bg-gray-800/80 border-gray-700/50 hover:bg-gray-800'
+        : 'bg-white border-gray-100 hover:shadow-lg';
+
+    const textColor = theme === 'dark' ? 'text-gray-100' : 'text-gray-900';
+    const subtextColor = theme === 'dark' ? 'text-gray-400' : 'text-gray-500';
+
     return (
-           <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 group">
+        <div className={`${cardBg} rounded-3xl p-8 shadow-sm border transition-all duration-300 group backdrop-blur-sm`}>
             <div className="flex items-center justify-between mb-6">
                 <div className={`${colorVariants[color]} group-hover:scale-110 transition-transform duration-300`}>
                     <Icon />
                 </div>
                 {trend && (
-                    <span className="text-md font-semibold text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
+                    <span className={`text-md font-semibold ${theme === 'dark' ? 'text-emerald-300 bg-emerald-900/50' : 'text-emerald-600 bg-emerald-50'} px-3 py-1 rounded-full`}>
                         {trend}
                     </span>
                 )}
             </div>
             <div className="space-y-2">
-                <p className="text-4xl font-black text-gray-900 leading-none">
+                <p className={`text-4xl font-black ${textColor} leading-none`}>
                     {typeof value === 'number' ? value.toLocaleString() : value}
                 </p>
-                <p className="text-gray-500 text-sm font-medium uppercase tracking-wide">{title}</p>
+                <p className={`${subtextColor} text-sm font-medium uppercase tracking-wide`}>{title}</p>
             </div>
         </div>
     );
 };
 
-// Custom Tooltip Component for Charts (renamed to avoid conflict)
-const CustomChartTooltip = ({ active, payload, label }) => {
+// Custom Tooltip Component for Charts
+const CustomChartTooltip = ({ active, payload, label, theme }) => {
     if (active && payload && payload.length) {
+        const bgColor = theme === 'dark' ? 'bg-gray-800' : 'bg-white';
+        const borderColor = theme === 'dark' ? 'border-gray-600' : 'border-gray-200';
+        const textColor = theme === 'dark' ? 'text-gray-100' : 'text-gray-900';
+
         return (
-            <div className="bg-white p-3 rounded-lg shadow-lg border border-gray-200">
-                <p className="font-medium text-gray-900">{label}</p>
+            <div className={`${bgColor} p-3 rounded-lg shadow-lg border ${borderColor}`}>
+                <p className={`font-medium ${textColor}`}>{label}</p>
                 {payload.map((entry, index) => (
                     <p key={index} className="text-sm" style={{ color: entry.color }}>
                         {entry.name}: {entry.value.toLocaleString()}
@@ -148,6 +164,7 @@ const CustomChartTooltip = ({ active, payload, label }) => {
 };
 
 const UsageDashboard = () => {
+    const { theme, setTheme } = useContext(ThemeContext);
     const [searchParams, setSearchParams] = useSearchParams();
     const [dashboardData, setDashboardData] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -162,6 +179,28 @@ const UsageDashboard = () => {
 
     // API Base URL
     const API_BASE_URL = 'https://live-server1.com';
+
+    // Theme-aware colors for charts
+    const getChartColors = useCallback(() => {
+        if (theme === 'dark') {
+            return {
+                grid: '#374151',
+                axis: '#9CA3AF',
+                success: '#10B981',
+                error: '#EF4444',
+                primary: '#3B82F6',
+                warning: '#F59E0B'
+            };
+        }
+        return {
+            grid: '#E5E7EB',
+            axis: '#6B7280',
+            success: '#10B981',
+            error: '#EF4444',
+            primary: '#3B82F6',
+            warning: '#F59E0B'
+        };
+    }, [theme]);
 
     // Fetch dashboard data
     const fetchDashboardData = useCallback(async (isRefresh = false) => {
@@ -226,22 +265,23 @@ const UsageDashboard = () => {
         const { metrics } = dashboardData;
         const successfulUploads = metrics.totalUploads - metrics.failedUploads;
         const successfulQueries = metrics.totalQueries - metrics.failedQueries;
+        const colors = getChartColors();
 
         return {
             uploadSuccess: [
-                { name: 'Successful', value: successfulUploads, color: '#10B981' },
-                { name: 'Failed', value: metrics.failedUploads, color: '#EF4444' }
+                { name: 'Successful', value: successfulUploads, color: colors.success },
+                { name: 'Failed', value: metrics.failedUploads, color: colors.error }
             ],
             querySuccess: [
-                { name: 'Successful', value: successfulQueries, color: '#3B82F6' },
-                { name: 'Failed', value: metrics.failedQueries, color: '#F59E0B' }
+                { name: 'Successful', value: successfulQueries, color: colors.primary },
+                { name: 'Failed', value: metrics.failedQueries, color: colors.warning }
             ],
             overview: [
                 { name: 'Uploads', successful: successfulUploads, failed: metrics.failedUploads },
                 { name: 'Queries', successful: successfulQueries, failed: metrics.failedQueries }
             ]
         };
-    }, [dashboardData]);
+    }, [dashboardData, getChartColors]);
 
     // Helper functions
     const formatDate = useCallback((dateString) => {
@@ -284,16 +324,21 @@ const UsageDashboard = () => {
         return { browser, device, icon };
     }, []);
 
+    // Theme-aware background
+    const backgroundClass = theme === 'dark'
+        ? 'min-h-screen bg-gradient-to-br from-gray-900 to-gray-800'
+        : 'min-h-screen bg-gradient-to-br from-slate-50 to-blue-50';
+
     // Loading state
     if (loading && !dashboardData) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+            <div className={backgroundClass}>
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                     <div className="mb-8">
-                        <div className="h-8 bg-gray-200 rounded w-64 mb-2"></div>
-                        <div className="h-4 bg-gray-200 rounded w-96"></div>
+                        <div className={`h-8 ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'} rounded w-64 mb-2`}></div>
+                        <div className={`h-4 ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'} rounded w-96`}></div>
                     </div>
-                    <LoadingSkeleton />
+                    <LoadingSkeleton theme={theme} />
                 </div>
             </div>
         );
@@ -301,15 +346,20 @@ const UsageDashboard = () => {
 
     // Error state
     if (error && !dashboardData) {
+        const errorBg = theme === 'dark' ? 'bg-gray-800' : 'bg-white';
+        const errorText = theme === 'dark' ? 'text-gray-100' : 'text-gray-900';
+        const errorSubtext = theme === 'dark' ? 'text-gray-400' : 'text-gray-600';
+        const errorBorder = theme === 'dark' ? 'border-gray-700' : 'border-gray-100';
+
         return (
-            <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
-                <div className="text-center bg-white p-8 rounded-2xl shadow-xl max-w-md border border-gray-100">
-                    <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <div className={`${backgroundClass} flex items-center justify-center`}>
+                <div className={`text-center ${errorBg} p-8 rounded-2xl shadow-xl max-w-md border ${errorBorder}`}>
+                    <div className={`w-16 h-16 ${theme === 'dark' ? 'bg-red-900/50' : 'bg-red-100'} rounded-full flex items-center justify-center mx-auto mb-4`}>
                         <Icons.Error />
                     </div>
-                    <h2 className="text-2xl font-bold text-gray-900 mb-2">Connection Error</h2>
-                    <p className="text-gray-600 mb-4">{error}</p>
-                    <p className="text-sm text-gray-500 mb-6">API: {API_BASE_URL}/api/usage</p>
+                    <h2 className={`text-2xl font-bold ${errorText} mb-2`}>Connection Error</h2>
+                    <p className={`${errorSubtext} mb-4`}>{error}</p>
+                    <p className={`text-sm ${errorSubtext} mb-6`}>API: {API_BASE_URL}/api/usage</p>
                     <button
                         onClick={() => fetchDashboardData()}
                         className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg transition-colors font-medium"
@@ -323,38 +373,58 @@ const UsageDashboard = () => {
 
     if (!dashboardData) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
-                <div className="text-gray-500">No data available</div>
+            <div className={`${backgroundClass} flex items-center justify-center`}>
+                <div className={theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}>No data available</div>
             </div>
         );
     }
 
     const { metrics, recentUploads, recentQueries, recentIPs } = dashboardData;
+    const colors = getChartColors();
+
+    // Theme-aware classes
+    const headerBg = theme === 'dark'
+        ? 'bg-gray-800/80 backdrop-blur-sm border-gray-700/50'
+        : 'bg-white/80 backdrop-blur-sm border-gray-200/50';
+
+    const headerText = theme === 'dark' ? 'text-gray-100' : 'text-gray-900';
+    const headerSubtext = theme === 'dark' ? 'text-gray-400' : 'text-gray-600';
+
+    const cardBg = theme === 'dark'
+        ? 'bg-gray-800/80 backdrop-blur-sm border-gray-700/50'
+        : 'bg-white/80 backdrop-blur-sm border-gray-200/50';
+
+    const tableBg = theme === 'dark' ? 'bg-gray-700/50' : 'bg-gray-50/50';
+    const tableText = theme === 'dark' ? 'text-gray-100' : 'text-gray-900';
+    const tableSubtext = theme === 'dark' ? 'text-gray-400' : 'text-gray-600';
+    const tableHover = theme === 'dark' ? 'hover:bg-gray-700/50' : 'hover:bg-gray-50/50';
+    const tableDivider = theme === 'dark' ? 'divide-gray-700/50' : 'divide-gray-200/50';
+    const tableBorder = theme === 'dark' ? 'border-gray-700/50' : 'border-gray-200/50';
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+        <div className={backgroundClass}>
             {/* Modern Header */}
-            <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 sticky top-[50px] z-10">
+            <header className={`${headerBg} border-b sticky top-[50px] z-10`}>
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="flex justify-between items-center py-6">
                         <div>
-                            <h1 className="text-2xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+                            <h1 className={`text-2xl font-bold ${theme === 'dark' ? 'bg-gradient-to-r from-gray-100 to-gray-300' : 'bg-gradient-to-r from-gray-900 to-gray-600'} bg-clip-text text-transparent`}>
                                 Usage Dashboard
                             </h1>
-                            <p className="text-gray-600 mt-1">Real-time analytics and monitoring</p>
+                            <p className={`${headerSubtext} mt-1`}>Real-time analytics and monitoring</p>
                         </div>
 
                         <div className="flex items-center space-x-4">
                             {/* Connection Status */}
-                            <div className="flex items-center space-x-2 px-3 py-2 rounded-lg bg-gray-50">
+                            <div className={`flex items-center space-x-2 px-3 py-2 rounded-lg ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'}`}>
                                 <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-400' : 'bg-red-400'}`}></div>
-                                <span className={`text-sm font-medium ${isOnline ? 'text-emerald-700' : 'text-red-700'}`}>
+                                <span className={`text-sm font-medium ${isOnline ? (theme === 'dark' ? 'text-emerald-300' : 'text-emerald-700') : (theme === 'dark' ? 'text-red-300' : 'text-red-700')}`}>
                                     {isOnline ? 'Connected' : 'Disconnected'}
                                 </span>
                             </div>
 
                             {/* Last Updated */}
-                            <div className="text-sm text-gray-500 hidden sm:block">
+                            <div className={`text-sm ${headerSubtext} hidden sm:block`}>
                                 Updated: {lastUpdated.toLocaleTimeString()}
                             </div>
 
@@ -375,8 +445,6 @@ const UsageDashboard = () => {
             </header>
 
             <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
- 
-
                 {/* Enhanced Metrics Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     <MetricCard
@@ -385,12 +453,14 @@ const UsageDashboard = () => {
                         icon={Icons.Upload}
                         color="blue"
                         trend="+12%"
+                        theme={theme}
                     />
                     <MetricCard
                         title="Failed Uploads"
                         value={metrics.failedUploads}
                         icon={Icons.Error}
                         color="red"
+                        theme={theme}
                     />
                     <MetricCard
                         title="Total Queries"
@@ -398,35 +468,37 @@ const UsageDashboard = () => {
                         icon={Icons.Search}
                         color="green"
                         trend="+8%"
+                        theme={theme}
                     />
                     <MetricCard
                         title="Failed Queries"
                         value={metrics.failedQueries}
                         icon={Icons.Error}
                         color="yellow"
+                        theme={theme}
                     />
                 </div>
 
                 {/* Enhanced Charts */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
                     {/* Stacked Bar Chart */}
-                    <div className="lg:col-span-2 bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 p-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-6">Success vs Failure Rate</h3>
+                    <div className={`lg:col-span-2 ${cardBg} rounded-2xl shadow-sm border p-6`}>
+                        <h3 className={`text-lg font-semibold ${headerText} mb-6`}>Success vs Failure Rate</h3>
                         <ResponsiveContainer width="100%" height={320}>
                             <BarChart data={chartData?.overview} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#E5E7EB" />
-                                <XAxis dataKey="name" stroke="#6B7280" fontSize={12} />
-                                <YAxis stroke="#6B7280" fontSize={12} />
-                                <Tooltip content={<CustomChartTooltip />} />
-                                <Bar dataKey="successful" stackId="a" fill="#10B981" radius={[0, 0, 0, 0]} />
-                                <Bar dataKey="failed" stackId="a" fill="#EF4444" radius={[4, 4, 0, 0]} />
+                                <CartesianGrid strokeDasharray="3 3" stroke={colors.grid} />
+                                <XAxis dataKey="name" stroke={colors.axis} fontSize={12} />
+                                <YAxis stroke={colors.axis} fontSize={12} />
+                                <Tooltip content={<CustomChartTooltip theme={theme} />} />
+                                <Bar dataKey="successful" stackId="a" fill={colors.success} radius={[0, 0, 0, 0]} />
+                                <Bar dataKey="failed" stackId="a" fill={colors.error} radius={[4, 4, 0, 0]} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
 
                     {/* Enhanced Donut Chart */}
-                    <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 p-6">
-                        <h3 className="text-lg font-semibold text-gray-900 mb-6">Upload Distribution</h3>
+                    <div className={`${cardBg} rounded-2xl shadow-sm border p-6`}>
+                        <h3 className={`text-lg font-semibold ${headerText} mb-6`}>Upload Distribution</h3>
                         <ResponsiveContainer width="100%" height={320}>
                             <PieChart>
                                 <Pie
@@ -442,33 +514,33 @@ const UsageDashboard = () => {
                                         <Cell key={`cell-${index}`} fill={entry.color} />
                                     ))}
                                 </Pie>
-                                <Tooltip content={<CustomChartTooltip />} />
+                                <Tooltip content={<CustomChartTooltip theme={theme} />} />
                             </PieChart>
                         </ResponsiveContainer>
                         <div className="flex justify-center space-x-6 mt-4">
                             {chartData?.uploadSuccess.map((entry, index) => (
                                 <div key={index} className="flex items-center space-x-2">
                                     <div className="w-3 h-3 rounded-full" style={{ backgroundColor: entry.color }}></div>
-                                    <span className="text-sm text-gray-600">{entry.name}</span>
+                                    <span className={`text-sm ${headerSubtext}`}>{entry.name}</span>
                                 </div>
                             ))}
                         </div>
                     </div>
                 </div>
 
-                               {/* Enhanced Filters */}
-                <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 p-6 mb-8">
+                {/* Enhanced Filters */}
+                <div className={`${cardBg} rounded-2xl shadow-sm border p-6 mb-8`}>
                     <div className="flex items-center space-x-2 mb-4">
                         <Icons.Filter />
-                        <h2 className="text-lg font-semibold text-gray-900">Filters</h2>
+                        <h2 className={`text-lg font-semibold ${headerText}`}>Filters</h2>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Upload Status</label>
+                            <label className={`block text-sm font-medium ${headerText} mb-2`}>Upload Status</label>
                             <select
                                 value={uploadFilter}
                                 onChange={(e) => updateFilter('uploadFilter', e.target.value)}
-                                className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                className={`w-full border ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-gray-100' : 'border-gray-300 bg-white text-gray-900'} rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors`}
                             >
                                 <option value="all">All Uploads</option>
                                 <option value="success">Successful Only</option>
@@ -476,16 +548,17 @@ const UsageDashboard = () => {
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Records Limit</label>
+                            <label className={`block text-sm font-medium ${headerText} mb-2`}>Records Limit</label>
                             <select
                                 value={limit}
                                 onChange={(e) => updateFilter('limit', e.target.value)}
-                                className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-white text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                className={`w-full border ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-gray-100' : 'border-gray-300 bg-white text-gray-900'} rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors`}
                             >
                                 <option value="25">25 Records</option>
                                 <option value="50">50 Records</option>
                                 <option value="100">100 Records</option>
                                 <option value="200">200 Records</option>
+                                ```jsx
                             </select>
                         </div>
                     </div>
@@ -493,93 +566,90 @@ const UsageDashboard = () => {
 
                 {/* Enhanced Data Tables */}
                 <div className="grid grid-cols-1 xl:grid-rows-2 gap-8 mb-8">
-       {/* Recent Uploads */}
-<div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden">
-    <div className="px-6 py-4 border-b border-gray-200/50 bg-gray-50/50">
-        <h3 className="text-lg font-semibold text-gray-900">
-            Recent Uploads ({recentUploads.length})
-        </h3>
-    </div>
-    <div className="overflow-x-auto">
-        <table className="min-w-full">
-            <thead className="bg-gray-50/50">
-                <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Chunks</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Error Message</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
-                </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200/50">
-                {recentUploads.slice(0, 10).map((upload) => (
-                    <tr key={upload.id} className="hover:bg-gray-50/50 transition-colors">
-                        <td className="px-6 py-4 whitespace-nowrap">
-                            <StatusBadge success={upload.success} />
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {formatFileSize(upload.size)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                            {upload.totalChunks}
-                        </td>
-                 <td className="px-6 py-4 text-sm text-gray-600">
-    {!upload.success && upload.error ? (
-        <div className="bg-red-50 text-red-700 px-2 py-1 rounded text-xs border border-red-200 whitespace-nowrap">
-            {upload.error}
-        </div>
-    ) : (
-        <span className="text-gray-400">-</span>
-    )}
-</td>
-
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {formatDate(upload.createdAt)}
-                        </td>
-                    </tr>
-                ))}
-            </tbody>
-        </table>
-    </div>
-</div>
-
+                    {/* Recent Uploads */}
+                    <div className={`${cardBg} rounded-2xl shadow-sm border overflow-hidden`}>
+                        <div className={`px-6 py-4 border-b ${tableBorder} ${tableBg}`}>
+                            <h3 className={`text-lg font-semibold ${headerText}`}>
+                                Recent Uploads ({recentUploads.length})
+                            </h3>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full">
+                                <thead className={tableBg}>
+                                    <tr>
+                                        <th className={`px-6 py-3 text-left text-xs font-medium ${tableSubtext} uppercase tracking-wider`}>Status</th>
+                                        <th className={`px-6 py-3 text-left text-xs font-medium ${tableSubtext} uppercase tracking-wider`}>Size</th>
+                                        <th className={`px-6 py-3 text-left text-xs font-medium ${tableSubtext} uppercase tracking-wider`}>Chunks</th>
+                                        <th className={`px-6 py-3 text-left text-xs font-medium ${tableSubtext} uppercase tracking-wider`}>Error Message</th>
+                                        <th className={`px-6 py-3 text-left text-xs font-medium ${tableSubtext} uppercase tracking-wider`}>Time</th>
+                                    </tr>
+                                </thead>
+                                <tbody className={`${tableDivider}`}>
+                                    {recentUploads.slice(0, 10).map((upload) => (
+                                        <tr key={upload.id} className={`${tableHover} transition-colors`}>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <StatusBadge success={upload.success} theme={theme} />
+                                            </td>
+                                            <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${tableText}`}>
+                                                {formatFileSize(upload.size)}
+                                            </td>
+                                            <td className={`px-6 py-4 whitespace-nowrap text-sm ${tableSubtext}`}>
+                                                {upload.totalChunks}
+                                            </td>
+                                            <td className={`px-6 py-4 text-sm ${tableSubtext}`}>
+                                                {!upload.success && upload.error ? (
+                                                    <div className={`${theme === 'dark' ? 'bg-red-900/50 text-red-300 border-red-700' : 'bg-red-50 text-red-700 border-red-200'} px-2 py-1 rounded text-xs border whitespace-nowrap`}>
+                                                        {upload.error}
+                                                    </div>
+                                                ) : (
+                                                    <span className={theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}>-</span>
+                                                )}
+                                            </td>
+                                            <td className={`px-6 py-4 whitespace-nowrap text-sm ${tableSubtext}`}>
+                                                {formatDate(upload.createdAt)}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
 
                     {/* Recent Queries */}
-                    <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden">
-                        <div className="px-6 py-4 border-b border-gray-200/50 bg-gray-50/50">
-                            <h3 className="text-lg font-semibold text-gray-900">
+                    <div className={`${cardBg} rounded-2xl shadow-sm border overflow-hidden`}>
+                        <div className={`px-6 py-4 border-b ${tableBorder} ${tableBg}`}>
+                            <h3 className={`text-lg font-semibold ${headerText}`}>
                                 Recent Queries ({recentQueries.length})
                             </h3>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="min-w-full">
-                                <thead className="bg-gray-50/50">
+                                <thead className={tableBg}>
                                     <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Segment</th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Time</th>
+                                        <th className={`px-6 py-3 text-left text-xs font-medium ${tableSubtext} uppercase tracking-wider`}>Status</th>
+                                        <th className={`px-6 py-3 text-left text-xs font-medium ${tableSubtext} uppercase tracking-wider`}>User</th>
+                                        <th className={`px-6 py-3 text-left text-xs font-medium ${tableSubtext} uppercase tracking-wider`}>Segment</th>
+                                        <th className={`px-6 py-3 text-left text-xs font-medium ${tableSubtext} uppercase tracking-wider`}>Time</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-200/50">
+                                <tbody className={tableDivider}>
                                     {recentQueries.slice(0, 10).map((query) => (
-                                        <tr key={query.id} className="hover:bg-gray-50/50 transition-colors">
+                                        <tr key={query.id} className={`${tableHover} transition-colors`}>
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                <StatusBadge success={query.success} errorMessage={query.error} />
+                                                <StatusBadge success={query.success} errorMessage={query.error} theme={theme} />
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                            <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${tableText}`}>
                                                 {query.userId}
                                             </td>
-                                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 font-mono">
-    <span className="bg-gray-100 px-2 py-1 rounded text-xs">
-        {query.segmentId.length > 15 
-            ? query.segmentId.substring(0, 15) + '...' 
-            : query.segmentId
-        }
-    </span>
-</td>
-
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            <td className={`px-6 py-4 whitespace-nowrap text-sm ${tableSubtext} font-mono`}>
+                                                <span className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'} px-2 py-1 rounded text-xs`}>
+                                                    {query.segmentId.length > 15
+                                                        ? query.segmentId.substring(0, 15) + '...'
+                                                        : query.segmentId
+                                                    }
+                                                </span>
+                                            </td>
+                                            <td className={`px-6 py-4 whitespace-nowrap text-sm ${tableSubtext}`}>
                                                 {formatDate(query.createdAt)}
                                             </td>
                                         </tr>
@@ -591,34 +661,33 @@ const UsageDashboard = () => {
                 </div>
 
                 {/* Enhanced IP Activity */}
-                <div className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-sm border border-gray-200/50 overflow-hidden">
-                    <div className="px-6 py-4 border-b border-gray-200/50 bg-gray-50/50">
+                <div className={`${cardBg} rounded-2xl shadow-sm border overflow-hidden`}>
+                    <div className={`px-6 py-4 border-b ${tableBorder} ${tableBg}`}>
                         <div className="flex items-center space-x-2">
                             <Icons.Globe />
-
-                            <h3 className="text-lg font-semibold text-gray-900">
+                            <h3 className={`text-lg font-semibold ${headerText}`}>
                                 Recent IP Activity ({recentIPs.length})
                             </h3>
                         </div>
                     </div>
                     <div className="overflow-x-auto">
                         <table className="min-w-full">
-                            <thead className="bg-gray-50/50">
+                            <thead className={tableBg}>
                                 <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">IP Address</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Browser</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User Agent</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Requests</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Seen</th>
+                                    <th className={`px-6 py-3 text-left text-xs font-medium ${tableSubtext} uppercase tracking-wider`}>IP Address</th>
+                                    <th className={`px-6 py-3 text-left text-xs font-medium ${tableSubtext} uppercase tracking-wider`}>Browser</th>
+                                    <th className={`px-6 py-3 text-left text-xs font-medium ${tableSubtext} uppercase tracking-wider`}>User Agent</th>
+                                    <th className={`px-6 py-3 text-left text-xs font-medium ${tableSubtext} uppercase tracking-wider`}>Requests</th>
+                                    <th className={`px-6 py-3 text-left text-xs font-medium ${tableSubtext} uppercase tracking-wider`}>Last Seen</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-200/50">
+                            <tbody className={tableDivider}>
                                 {recentIPs.map((ip, index) => {
                                     const browserInfo = getBrowserInfo(ip.userAgent);
                                     return (
-                                        <tr key={index} className="hover:bg-gray-50/50 transition-colors">
+                                        <tr key={index} className={`${tableHover} transition-colors`}>
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                <span className="text-sm font-mono text-gray-900 bg-gray-100 px-2 py-1 rounded">
+                                                <span className={`text-sm font-mono ${tableText} ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'} px-2 py-1 rounded`}>
                                                     {ip.ipAddress}
                                                 </span>
                                             </td>
@@ -626,22 +695,22 @@ const UsageDashboard = () => {
                                                 <div className="flex items-center space-x-3">
                                                     <span className="text-lg">{browserInfo.icon}</span>
                                                     <div>
-                                                        <div className="text-sm font-medium text-gray-900">{browserInfo.browser}</div>
-                                                        <div className="text-xs text-gray-500 capitalize">{browserInfo.device}</div>
+                                                        <div className={`text-sm font-medium ${tableText}`}>{browserInfo.browser}</div>
+                                                        <div className={`text-xs ${tableSubtext} capitalize`}>{browserInfo.device}</div>
                                                     </div>
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 max-w-xs">
-                                                <div className="text-xs text-gray-500 font-mono truncate" title={ip.userAgent}>
+                                                <div className={`text-xs ${tableSubtext} font-mono truncate`} title={ip.userAgent}>
                                                     {ip.userAgent}
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
-                                                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                                                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${theme === 'dark' ? 'bg-blue-900/50 text-blue-300 border-blue-700' : 'bg-blue-50 text-blue-700 border-blue-200'} border`}>
                                                     {ip.count} requests
                                                 </span>
                                             </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                            <td className={`px-6 py-4 whitespace-nowrap text-sm ${tableSubtext}`}>
                                                 {formatDate(ip.lastSeen)}
                                             </td>
                                         </tr>
