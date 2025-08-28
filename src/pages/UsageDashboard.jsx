@@ -107,7 +107,7 @@ const MetricCard = ({ title, value, icon: Icon, trend, color = 'blue' }) => {
     };
 
     return (
-           <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 group">
+        <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 hover:shadow-lg transition-all duration-300 group">
             <div className="flex items-center justify-between mb-6">
                 <div className={`${colorVariants[color]} group-hover:scale-110 transition-transform duration-300`}>
                     <Icon />
@@ -285,8 +285,8 @@ const UsageDashboard = () => {
     // Loading state
     if (loading && !dashboardData) {
         return (
-            <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="min-h-screen">
+                <div className="max-w-7xl mx-auto px-6 lg:px-8 py-6">
                     <div className="mb-8">
                         <div className="h-8 bg-gray-200 rounded w-64 mb-2"></div>
                         <div className="h-4 bg-gray-200 rounded w-96"></div>
@@ -296,6 +296,7 @@ const UsageDashboard = () => {
             </div>
         );
     }
+
 
     // Error state
     if (error && !dashboardData) {
@@ -632,10 +633,6 @@ const UsageDashboard = () => {
                     </div>
                 </div>
 
-                {/* Footer with additional info */}
-                <div className="mt-8 text-center text-sm text-gray-500">
-                    <p>Dashboard automatically refreshes every 30 seconds</p>
-                </div>
             </main>
         </div>
     );
